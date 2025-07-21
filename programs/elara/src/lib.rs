@@ -1,26 +1,33 @@
+#![allow(unexpected_cfgs)]
+
+use anchor_lang::prelude::*;
+use light_sdk::{cpi::CpiSigner, derive_light_cpi_signer};
+
+declare_id!("4LhEEtzAhM6wEXJR2YQHPEs79UEx8e6HncmeHbqbW1w1");
+declare_program!(jupiter_aggregator);
+
+pub const LIGHT_CPI_SIGNER: CpiSigner =
+    derive_light_cpi_signer!("4LhEEtzAhM6wEXJR2YQHPEs79UEx8e6HncmeHbqbW1w1");
+
 pub mod constants;
 pub mod error;
 pub mod instructions;
 pub mod state;
 
-use anchor_lang::prelude::*;
-
 pub use constants::*;
 pub use instructions::*;
-pub use state::*;
-
-declare_id!("4LhEEtzAhM6wEXJR2YQHPEs79UEx8e6HncmeHbqbW1w1");
-declare_program!(jupiter_aggregator);
 
 #[program]
 pub mod elara {
     use super::*;
 
-    pub fn initialize_order(
-        ctx: Context<InitializeOrder>,
-        args: InitializeOrderParams,
+    pub fn initialize_order<'info>(
+        ctx: Context<'_, '_, '_, 'info, InitializeOrder<'info>>,
+        order_args: InitializeOrderParams,
+
+        light_args: LightArgs,
     ) -> Result<()> {
-        initialize_order::init(ctx, args)
+        initialize_order::init(ctx, order_args, light_args)
     }
 
     pub fn cancel_order(ctx: Context<CancelOrder>) -> Result<()> {
