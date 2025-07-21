@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 use light_sdk::{LightDiscriminator, LightHasher};
 
-#[derive(Debug, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher)]
+#[derive(
+    Debug, Clone, Copy, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher,
+)]
 pub struct EscrowAccount {
     #[hash]
     pub maker: Pubkey,
@@ -15,7 +17,9 @@ pub struct EscrowAccount {
     pub updated_at: i64,
 }
 
-#[derive(Debug, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher)]
+#[derive(
+    Debug, Clone, Copy, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher,
+)]
 pub struct Tokens {
     #[hash]
     pub input_mint: Pubkey,
@@ -27,7 +31,9 @@ pub struct Tokens {
     pub output_token_program: Pubkey,
 }
 
-#[derive(Debug, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher)]
+#[derive(
+    Debug, Clone, Copy, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher,
+)]
 pub struct Amount {
     pub ori_making_amount: u64,
     pub ori_taking_amount: u64,

@@ -19,6 +19,7 @@ import {
 import {
   ADDRESS_QUEUE,
   ADDRESS_TREE,
+  CLOSE_ACCOUNTS,
   INIT_REMAINING_ACCOUNTS,
 } from "./address";
 
@@ -35,7 +36,7 @@ describe("elara", () => {
     "9RzWC4ZS6LdNUP2LwaY7Ztq5sTxgt3dFLp2jjokhm9Vz"
   );
 
-  const unique_id = new anchor.BN(100);
+  const unique_id = new anchor.BN(123400);
   const protocol_vault = PublicKey.findProgramAddressSync(
     [Buffer.from("protocol_vault")],
     program.programId
@@ -110,22 +111,100 @@ describe("elara", () => {
     console.log("Order initialized  signature:", tx);
   });
 
-  /* 
   it("Cancel order", async () => {
     console.log("Cancelling order...");
+
+    let compressed_account = await rpc.getCompressedAccount(
+      bn(address.toBytes())
+    );
+
+    let hash = compressed_account.hash;
+
+    let proof = await rpc.getValidityProofV0(
+      [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
+      []
+    );
+
+    const validityProof = proof.compressedProof;
+
+    const buffer = compressed_account?.data?.data!;
+
+    const maker_bytes = buffer.slice(0, 32);
+    const unique_id = buffer.readBigUInt64LE(32);
+
+    const input_mint_bytes = buffer.slice(40, 72);
+    const output_mint = buffer.slice(72, 104);
+    const input_token_program = buffer.slice(104, 136);
+    const output_token_program = buffer.slice(136, 168);
+
+    const ori_making_amount = buffer.readBigUInt64LE(168);
+    const ori_taking_amount = buffer.readBigUInt64LE(176);
+    const making_amount = buffer.readBigUInt64LE(184);
+    const taking_amount = buffer.readBigUInt64LE(192);
+
+    const slippage_bps = buffer.readBigUInt64LE(200);
+    const fee_bps = buffer.readBigUInt64LE(208);
+    const expired_at = buffer.readBigInt64LE(216);
+    const created_at = buffer.readBigInt64LE(224);
+    const updated_at = buffer.readBigInt64LE(232);
+
     const tx = await program.methods
-      .cancelOrder()
+      .cancelOrder(
+        {
+          maker: new PublicKey(maker_bytes),
+          uniqueId: new BN(unique_id),
+          tokens: {
+            inputMint: new PublicKey(input_mint_bytes),
+            outputMint: new PublicKey(output_mint),
+            inputTokenProgram: new PublicKey(input_token_program),
+            outputTokenProgram: new PublicKey(output_token_program),
+          },
+          amount: {
+            makingAmount: new BN(making_amount),
+            takingAmount: new BN(taking_amount),
+            oriMakingAmount: new BN(ori_making_amount),
+            oriTakingAmount: new BN(ori_taking_amount),
+          },
+          expiredAt: new BN(expired_at),
+          slippageBps: new BN(slippage_bps),
+          feeBps: new BN(fee_bps),
+          createdAt: new BN(created_at),
+          updatedAt: new BN(updated_at),
+        },
+        {
+          0: {
+            a: validityProof.a,
+            b: validityProof.b,
+            c: validityProof.c,
+          },
+        },
+        {
+          address: compressed_account.address,
+          treeInfo: {
+            rootIndex: proof.rootIndices[0],
+            merkleTreePubkeyIndex: 0,
+            queuePubkeyIndex: 1,
+            proveByIndex: false,
+            leafIndex: compressed_account.leafIndex,
+          },
+          outputStateTreeIndex: 0,
+        }
+      )
       .accounts({
         payer: payer.publicKey,
         maker: payer.publicKey,
-        order: Keypair.generate().publicKey,
         inputMint: input_mint,
         inputTokenProgram: TOKEN_PROGRAM_ID,
       })
+      .remainingAccounts(CLOSE_ACCOUNTS)
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+      ])
       .rpc();
     console.log("Order cancelled with transaction signature:", tx);
   });
 
+  /*
   it("Fill order", async () => {
     console.clear();
     console.log("fetching swap...");

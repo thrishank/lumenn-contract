@@ -64,3 +64,20 @@ export const INIT_REMAINING_ACCOUNTS = [
   { pubkey: STATE_TREE, isSigner: false, isWritable: true },
   { pubkey: ADDRESS_QUEUE, isSigner: false, isWritable: true },
 ];
+
+export const CLOSE_ACCOUNTS = [
+  { pubkey: LIGHT_SYSTEM_PROGRAM, isSigner: false, isWritable: false },
+  { pubkey: CPI_AUTHORITY, isSigner: false, isWritable: false },
+  { pubkey: REGISTERED_PROGRAM_PDA, isSigner: false, isWritable: false },
+  { pubkey: NOOP_PROGRAM, isSigner: false, isWritable: false },
+  {
+    pubkey: ACCOUNT_COMPRESSION_AUTHORITY,
+    isSigner: false,
+    isWritable: false,
+  },
+  { pubkey: COMPRESSION_PROGRAM, isSigner: false, isWritable: false },
+  { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+  { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
+  { pubkey: STATE_TREE, isSigner: false, isWritable: true },
+  { pubkey: STATE_QUEUE, isSigner: false, isWritable: true },
+];
