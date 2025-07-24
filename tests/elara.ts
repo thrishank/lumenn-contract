@@ -37,7 +37,7 @@ describe("elara", () => {
   );
 
   // const unique_id = new anchor.BN(Date.now());
-  const unique_id = new anchor.BN(12321);
+  const unique_id = new anchor.BN(143242234);
   const protocol_vault = PublicKey.findProgramAddressSync(
     [Buffer.from("protocol_vault")],
     program.programId
@@ -56,10 +56,10 @@ describe("elara", () => {
     "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
 
   const rpc = createRpc(url, url, url);
+  /*
   it("init order", async () => {
     console.clear();
     console.log("Initializing order...");
-    console.log("protocol_vault: ", protocol_vault.toString());
 
     const proof = await rpc.getValidityProofV0(undefined, [
       {
@@ -68,6 +68,8 @@ describe("elara", () => {
         queue: ADDRESS_QUEUE,
       },
     ]);
+
+    console.log(proof);
 
     const validityProof = proof.compressedProof;
 
@@ -111,6 +113,7 @@ describe("elara", () => {
     console.log("Order initialized  signature:", tx);
   });
 
+*/
   /*
   it("create token account", async () => {
     let compressed_account = await rpc.getCompressedAccount(
@@ -212,8 +215,8 @@ describe("elara", () => {
       .rpc();
     console.log("Order cancelled with transaction signature:", tx);
   });
+  */
 
-  /*
   it("Cancel order", async () => {
     console.log("Cancelling order...");
 
@@ -306,7 +309,6 @@ describe("elara", () => {
       .rpc();
     console.log("Order cancelled with transaction signature:", tx);
   });
-  */
 
   /*
   it("Fill order", async () => {

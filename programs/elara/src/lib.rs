@@ -40,8 +40,11 @@ pub mod elara {
         cancel_order::cancel(ctx, escrow_account, proof, account_meta)
     }
 
-    pub fn fill_order(ctx: Context<FillOrder>, data: Vec<u8>) -> Result<()> {
-        fill_order::fill(ctx, data)
+    pub fn fill_order<'info>(
+        ctx: Context<'_, '_, '_, 'info, FillOrder<'info>>,
+        args: FillOrderParams,
+    ) -> Result<()> {
+        fill_order::fill(ctx, args)
     }
 
     pub fn flash_fill_order(ctx: Context<FillOrder>, data: Vec<u8>) -> Result<()> {

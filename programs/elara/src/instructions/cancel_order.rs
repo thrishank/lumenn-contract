@@ -18,7 +18,9 @@ pub struct CancelOrder<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    pub maker: Signer<'info>,
+    /// CHECK: signed check in the instruction logic if expired no need the signer check, worker
+    /// will close
+    pub maker: AccountInfo<'info>,
 
     pub input_mint: InterfaceAccount<'info, Mint>,
 

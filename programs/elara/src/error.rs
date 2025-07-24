@@ -16,4 +16,8 @@ pub enum ErrorCode {
     TokenAccountAlreadyExists,
     #[msg("Invalid instruction data from jupiter must be a exact out route or shared accounts exact out route")]
     InvalidJupInstructionData,
+    #[msg("Invalid in amount, must match the escrow account making amount")]
+    InvalidInAmount,
+    #[msg("Out taking amount too low")]
+    InvalidOutTakingAmount,
 }
