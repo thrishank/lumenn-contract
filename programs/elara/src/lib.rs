@@ -1,5 +1,3 @@
-#![allow(unexpected_cfgs)]
-
 use anchor_lang::prelude::*;
 use light_sdk::instruction::{account_meta::CompressedAccountMeta, ValidityProof};
 use light_sdk::{cpi::CpiSigner, derive_light_cpi_signer};
@@ -16,7 +14,7 @@ pub mod instructions;
 pub mod state;
 
 pub use constants::*;
-pub use instructions::*;
+use instructions::*;
 
 use crate::state::EscrowAccount;
 
@@ -43,13 +41,18 @@ pub mod elara {
     }
 
     pub fn fill_order(ctx: Context<FillOrder>, data: Vec<u8>) -> Result<()> {
-        // if the user does not have output mint ata, swap some tokens to 0.00204 SOL using ExactOut
         fill_order::fill(ctx, data)
     }
 
-    pub fn create_account(ctx: Context<CancelOrder>, data: Vec<u8>) -> Result<()> {
-        // create a new account for the user
-        // create_account::create(ctx, data)
+    pub fn flash_fill_order(ctx: Context<FillOrder>, data: Vec<u8>) -> Result<()> {
+        // flash fill
         Ok(())
+    }
+
+    pub fn create_ata<'info>(
+        ctx: Context<'_, '_, '_, 'info, CreateToken<'info>>,
+        args: CreateTokenAccountArgs,
+    ) -> Result<()> {
+        create_token_account::create_token_account(ctx, args)
     }
 }

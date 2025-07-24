@@ -2,9 +2,8 @@ use anchor_lang::prelude::*;
 
 use light_sdk::{
     account::LightAccount,
-    address::v1::derive_address,
     cpi::{CpiAccounts, CpiInputs},
-    instruction::{account_meta::CompressedAccountMeta, PackedAddressTreeInfo, ValidityProof},
+    instruction::{account_meta::CompressedAccountMeta, ValidityProof},
 };
 
 use anchor_spl::{
@@ -75,7 +74,11 @@ pub fn cancel<'info>(
     )
     .map_err(ProgramError::from)?;
 
-    if ctx.accounts.maker.key() != escrow.maker {
+    // NOTE: if the order is not expired then we need the signer check to allow only make the
+    // cancel the order
+    if escrow_account.expired_at > Clock::get()?.unix_timestamp
+        && ctx.accounts.maker.key() != escrow.maker
+    {
         return Err(error!(ErrorCode::Unauthorized));
     }
 
