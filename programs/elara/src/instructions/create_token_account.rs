@@ -149,7 +149,7 @@ pub fn light_cpi<'info>(
 ) -> Result<()> {
     let escrow_account = args.escrow_account;
 
-    let escrow = LightAccount::<'_, EscrowAccount>::new_mut(
+    let mut escrow = LightAccount::<'_, EscrowAccount>::new_mut(
         &crate::ID,
         &args.account_meta,
         EscrowAccount {
@@ -166,11 +166,13 @@ pub fn light_cpi<'info>(
     )
     .map_err(ProgramError::from)?;
 
-    escrow
+    escrow.amount.making_amount = escrow
         .amount
         .making_amount
         .checked_sub(amount_swapped)
         .ok_or(ProgramError::ArithmeticOverflow)?;
+
+    // FIX: calculate the equivalent taking amount and subtract it from the state
 
     let cpi_accounts = light_sdk::cpi::CpiAccounts::new(
         ctx.accounts.payer.as_ref(),

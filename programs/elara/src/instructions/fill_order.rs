@@ -28,10 +28,6 @@ pub struct FillOrder<'info> {
     #[account(mut)]
     pub maker: UncheckedAccount<'info>,
 
-    /// CHECK: order state account
-    #[account(mut)]
-    pub order: UncheckedAccount<'info>,
-
     pub input_mint: InterfaceAccount<'info, Mint>,
 
     pub output_mint: InterfaceAccount<'info, Mint>,
@@ -84,6 +80,11 @@ pub fn fill<'info>(
     if args.swap_data.len() < 8 {
         return Err(error!(ErrorCode::InvalidJupInstructionData));
     }
+
+    if args.escrow_account.maker != ctx.accounts.maker.key() {
+        return Err(error!(ErrorCode::InvalidEscrowMaker));
+    }
+
     // FIXME: validate the accounts
     let remaining = &ctx.remaining_accounts;
     let light_accounts = &remaining[0..10];
@@ -93,14 +94,22 @@ pub fn fill<'info>(
     let escrow_account = args.escrow_account;
 
     // FIXME: match the full route discrimator all 8 bytes
-    let (in_amount, quoted_out_amount) = match args.swap_data[0] {
+    let (in_amount, quoted_out_amount, slippage_bps) = match args.swap_data[0] {
         229 => {
             let route_data = Route::deserialize(&mut input_data)?;
-            (route_data.in_amount, route_data.quoted_out_amount)
+            (
+                route_data.in_amount,
+                route_data.quoted_out_amount,
+                route_data.slippage_bps,
+            )
         }
         193 => {
             let route_data = SharedAccountsRoute::deserialize(&mut input_data)?;
-            (route_data.in_amount, route_data.quoted_out_amount)
+            (
+                route_data.in_amount,
+                route_data.quoted_out_amount,
+                route_data.slippage_bps,
+            )
         }
         _ => return Err(error!(ErrorCode::InvalidJupInstructionData)),
     };
@@ -109,8 +118,12 @@ pub fn fill<'info>(
         return Err(error!(ErrorCode::InvalidInAmount));
     }
 
-    if quoted_out_amount >= escrow_account.amount.taking_amount {
-        return Err(error!(ErrorCode::InvalidOutTakingAmount));
+    if quoted_out_amount <= escrow_account.amount.taking_amount {
+        return Err(error!(ErrorCode::LowTakingAmount));
+    }
+
+    if slippage_bps > escrow_account.slippage_bps {
+        return Err(error!(ErrorCode::SlippageTooHigh));
     }
 
     swap_cpi(&ctx, &args.swap_data, jupiter_accounts)?;

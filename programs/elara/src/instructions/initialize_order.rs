@@ -70,6 +70,12 @@ pub struct InitializeOrder<'info> {
 
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+
+    #[account(
+        seeds = [b"event_authority"],
+        bump
+    )]
+    pub event_authority: SystemAccount<'info>,
 }
 
 pub fn init<'info>(
@@ -131,6 +137,17 @@ pub fn init<'info>(
     cpi.invoke_light_system_program(light_cpi_accounts)
         .map_err(ProgramError::from)?;
 
+    emit!(OrderInitialized {
+        maker: ctx.accounts.maker.key(),
+        unique_id: order_args.unique_id,
+        input_mint: ctx.accounts.input_mint.key(),
+        output_mint: ctx.accounts.output_mint.key(),
+        making_amount: order_args.making_amount,
+        taking_amount: order_args.taking_amount,
+        slippage_bps: order_args.slippage_bps,
+        expired_at: order_args.expired_at.unwrap_or(0),
+    });
+
     let transfer_accounts = TransferChecked {
         from: ctx.accounts.maker_input_mint_ata.to_account_info(),
         to: ctx.accounts.protocol_vault_input_mint_ata.to_account_info(),
@@ -156,7 +173,7 @@ pub struct InitializeOrderParams {
     pub making_amount: u64,
     pub taking_amount: u64,
     pub expired_at: Option<i64>,
-    pub slippage_bps: u64,
+    pub slippage_bps: u16,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -164,4 +181,16 @@ pub struct LightArgs {
     pub proof: ValidityProof,
     pub address_tree_info: PackedAddressTreeInfo,
     pub output_state_tree_index: u8,
+}
+
+#[event]
+pub struct OrderInitialized {
+    pub maker: Pubkey,
+    pub unique_id: u64,
+    pub input_mint: Pubkey,
+    pub output_mint: Pubkey,
+    pub making_amount: u64,
+    pub taking_amount: u64,
+    pub slippage_bps: u16,
+    pub expired_at: i64,
 }

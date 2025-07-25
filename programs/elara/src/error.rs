@@ -19,5 +19,9 @@ pub enum ErrorCode {
     #[msg("Invalid in amount, must match the escrow account making amount")]
     InvalidInAmount,
     #[msg("Out taking amount too low")]
-    InvalidOutTakingAmount,
+    LowTakingAmount,
+    #[msg("Invalid escrow maker, must be the same as the escrow account maker")]
+    InvalidEscrowMaker,
+    #[msg("Slipppage too high")]
+    SlippageTooHigh,
 }

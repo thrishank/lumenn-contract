@@ -9,3 +9,6 @@ pub use fill_order::*;
 
 pub mod create_token_account;
 pub use create_token_account::*;
+
+pub mod partial_fill_order;
+pub use partial_fill_order::*;
