@@ -7,8 +7,8 @@ use light_sdk::{LightDiscriminator, LightHasher};
 pub struct EscrowAccount {
     #[hash]
     pub maker: Pubkey,
-    pub unique_id: u64,
     pub tokens: Tokens,
+    pub unique_id: u64,
     pub amount: Amount,
     pub slippage_bps: u16,
     pub fee_bps: u64,
@@ -37,8 +37,6 @@ pub struct Tokens {
 pub struct Amount {
     pub ori_making_amount: u64,
     pub ori_taking_amount: u64,
-    // what is the need of this ?
-    // pub borrow_making_amount: u64,
     pub making_amount: u64,
     pub taking_amount: u64,
 }

@@ -13,10 +13,10 @@ use light_sdk::{
 };
 
 use crate::{
-    error::ErrorCode,
+    error::CustomError,
     instructions::{ExactOutRoute, SharedAccountsExactOutRoute},
     state::EscrowAccount,
-    PROTOCOL_VAULT_SEED,
+    swap_cpi, PROTOCOL_VAULT_SEED,
 };
 use jupiter_aggregator::program::Jupiter;
 
@@ -82,11 +82,11 @@ pub fn flash_fill_order<'info>(
     args: PartialFillOrderParams,
 ) -> Result<()> {
     if args.swap_data.len() < 8 {
-        return Err(error!(ErrorCode::InvalidJupInstructionData));
+        return Err(error!(CustomError::InvalidJupInstructionData));
     }
 
     if args.escrow_account.maker != ctx.accounts.maker.key() {
-        return Err(error!(ErrorCode::InvalidEscrowMaker));
+        return Err(error!(CustomError::InvalidEscrowMaker));
     }
 
     // FIXME: validate the accounts
@@ -114,11 +114,11 @@ pub fn flash_fill_order<'info>(
                 route_data.slippage_bps,
             )
         }
-        _ => return Err(error!(ErrorCode::InvalidJupInstructionData)),
+        _ => return Err(error!(CustomError::InvalidJupInstructionData)),
     };
 
     if out_amount != args.taking_amount {
-        return Err(error!(ErrorCode::InvalidOutAmount));
+        return Err(error!(CustomError::InvalidOutAmount));
     }
 
     if in_amount < escrow_account.amount.making_amount {
@@ -126,43 +126,55 @@ pub fn flash_fill_order<'info>(
     }
 
     if slippage_bps > escrow_account.slippage_bps {
-        return Err(error!(ErrorCode::SlippageTooHigh));
+        return Err(error!(CustomError::SlippageTooHigh));
     }
 
-    swap_cpi(&ctx, &args.swap_data, jupiter_accounts)?;
+    swap_cpi(
+        &args.swap_data,
+        jupiter_accounts,
+        &ctx.accounts.protocol_vault.to_account_info(),
+        &ctx.accounts.jupiter_program,
+    )?;
     light_cpi(&ctx, light_accounts, &args, in_amount, out_amount)?;
-    // add transfer instruction to move tokens from protocol vault to maker
-
+    transfer_tokens(&ctx, out_amount)?;
+    emit!(PartialFillOrderEvent {
+        maker: ctx.accounts.maker.key(),
+        input_mint: escrow_account.tokens.input_mint,
+        output_mint: escrow_account.tokens.output_mint,
+        slippage_bps: escrow_account.slippage_bps,
+        in_amount,
+        out_amount,
+        fee_bps: escrow_account.fee_bps,
+        escrow_account,
+    });
     Ok(())
 }
 
-pub fn swap_cpi<'info>(
+pub fn transfer_tokens<'info>(
     ctx: &Context<'_, '_, '_, 'info, PartialFill<'info>>,
-    swap_data: &[u8],
-    accounts: &[AccountInfo<'info>],
+    amount: u64,
 ) -> Result<()> {
-    let account_metas: Vec<AccountMeta> = accounts
-        .iter()
-        .map(|acc| {
-            let is_signer = acc.key == &ctx.accounts.protocol_vault.key();
-            AccountMeta {
-                pubkey: *acc.key,
-                is_signer,
-                is_writable: acc.is_writable,
-            }
-        })
-        .collect();
+    let cpi_accounts = TransferChecked {
+        from: ctx
+            .accounts
+            .protocol_vault_output_mint_ata
+            .to_account_info(),
+        to: ctx.accounts.maker_output_mint_ata.to_account_info(),
+        authority: ctx.accounts.protocol_vault.to_account_info(),
+        mint: ctx.accounts.input_mint.to_account_info(),
+    };
+
+    let cpi_transfer = CpiContext::new(
+        ctx.accounts.output_token_program.to_account_info(),
+        cpi_accounts,
+    );
 
     let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
 
-    invoke_signed(
-        &Instruction {
-            program_id: ctx.accounts.jupiter_program.key(),
-            accounts: account_metas,
-            data: swap_data.to_vec(),
-        },
-        accounts,
-        signer_seeds,
+    transfer_checked(
+        cpi_transfer.with_signer(signer_seeds),
+        amount,
+        ctx.accounts.output_mint.decimals,
     )?;
 
     Ok(())
@@ -224,4 +236,16 @@ pub fn light_cpi<'info>(
         .map_err(ProgramError::from)?;
 
     Ok(())
+}
+
+#[event]
+pub struct PartialFillOrderEvent {
+    pub maker: Pubkey,
+    pub input_mint: Pubkey,
+    pub output_mint: Pubkey,
+    pub in_amount: u64,
+    pub out_amount: u64,
+    pub slippage_bps: u16,
+    pub fee_bps: u64,
+    pub escrow_account: EscrowAccount,
 }

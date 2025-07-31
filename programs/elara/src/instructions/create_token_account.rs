@@ -1,10 +1,4 @@
-use anchor_lang::{
-    prelude::*,
-    solana_program::{
-        instruction::{AccountMeta, Instruction},
-        program::invoke_signed,
-    },
-};
+use anchor_lang::prelude::*;
 use anchor_spl::associated_token::{create, Create};
 use anchor_spl::{
     associated_token::{get_associated_token_address, AssociatedToken},
@@ -20,10 +14,10 @@ declare_program!(jupiter_aggregator);
 declare_program!(idl);
 
 use crate::{
-    error::ErrorCode,
+    error::CustomError,
     instructions::{ExactOutRoute, SharedAccountsExactOutRoute},
     state::EscrowAccount,
-    LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
+    swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
 
 #[derive(Accounts)]
@@ -68,11 +62,11 @@ pub fn create_token_account<'info>(
     let expected_ata =
         get_associated_token_address(&ctx.accounts.maker.key(), &ctx.accounts.mint.key());
     if ctx.accounts.maker_token_ata.key() != expected_ata {
-        return Err(error!(ErrorCode::InvalidTokenAccount));
+        return Err(error!(CustomError::InvalidTokenAccount));
     }
 
     if !ctx.accounts.maker_token_ata.data_is_empty() {
-        return Err(error!(ErrorCode::TokenAccountAlreadyExists));
+        return Err(error!(CustomError::TokenAccountAlreadyExists));
     }
 
     let remaining = &ctx.remaining_accounts;
@@ -86,57 +80,30 @@ pub fn create_token_account<'info>(
         208 => {
             let swap_data = ExactOutRoute::deserialize(&mut input_data)?;
             if swap_data.out_amount != 2039280 {
-                return Err(error!(ErrorCode::InvalidOutAmount));
+                return Err(error!(CustomError::InvalidOutAmount));
             }
-            //swap_cpi(&ctx, &data, jupiter_accounts)?;
+            swap_cpi(
+                &args.swap_data,
+                jupiter_accounts,
+                &ctx.accounts.jupiter_program,
+                &ctx.accounts.protocol_vault.to_account_info(),
+            )?;
             light_cpi(&ctx, light_accounts, &args, swap_data.quoted_in_amount)?;
             create_associated_token_account(&ctx)?;
         }
         176 => {
             let swap_data = SharedAccountsExactOutRoute::deserialize(&mut input_data)?;
             if swap_data.out_amount != 2039280 {
-                return Err(error!(ErrorCode::InvalidOutAmount));
+                return Err(error!(CustomError::InvalidOutAmount));
             }
             // Self::swap_cpi(&ctx, &data, jupiter_accounts)?;
             light_cpi(&ctx, light_accounts, &args, swap_data.quoted_in_amount)?;
             create_associated_token_account(&ctx)?;
         }
         _ => {
-            return Err(error!(ErrorCode::InvalidJupInstructionData));
+            return Err(error!(CustomError::InvalidJupInstructionData));
         }
     }
-
-    Ok(())
-}
-
-pub fn swap_cpi<'info>(
-    ctx: &Context<'_, '_, '_, 'info, CreateToken<'info>>,
-    swap_data: &[u8],
-    accounts: &[AccountInfo<'info>],
-) -> Result<()> {
-    let account_metas: Vec<AccountMeta> = accounts
-        .iter()
-        .map(|acc| {
-            let is_signer = acc.key == &ctx.accounts.protocol_vault.key();
-            AccountMeta {
-                pubkey: *acc.key,
-                is_signer,
-                is_writable: acc.is_writable,
-            }
-        })
-        .collect();
-
-    let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
-
-    invoke_signed(
-        &Instruction {
-            program_id: ctx.accounts.jupiter_program.key(),
-            accounts: account_metas,
-            data: swap_data.to_vec(),
-        },
-        accounts,
-        signer_seeds,
-    )?;
 
     Ok(())
 }

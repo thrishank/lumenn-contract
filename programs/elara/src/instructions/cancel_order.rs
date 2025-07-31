@@ -1,7 +1,10 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 
 use light_sdk::{
     account::LightAccount,
+    address::v1::derive_address,
     cpi::{CpiAccounts, CpiInputs},
     instruction::{account_meta::CompressedAccountMeta, ValidityProof},
 };
@@ -11,15 +14,16 @@ use anchor_spl::{
     token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 
-use crate::{error::ErrorCode, state::EscrowAccount};
+use crate::{error::CustomError, state::EscrowAccount};
 
 #[derive(Accounts)]
 pub struct CancelOrder<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// CHECK: signed check in the instruction logic if expired no need the signer check, worker
-    /// will close
+    /// The maker of the order - must be signer for non-expired orders
+    /// For expired orders, anyone can cancel (including workers/keepers)
+    /// CHECK: Verified in instruction logic based on expiration status
     pub maker: AccountInfo<'info>,
 
     pub input_mint: InterfaceAccount<'info, Mint>,
@@ -53,15 +57,21 @@ pub struct CancelOrder<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct CancelOrderParams {
+    pub escrow_account: EscrowAccount,
+    pub proof: ValidityProof,
+    pub account_meta: CompressedAccountMeta,
+}
+
 pub fn cancel<'info>(
     ctx: Context<'_, '_, '_, 'info, CancelOrder<'info>>,
-    escrow_account: EscrowAccount,
-    proof: ValidityProof,
-    account_meta: CompressedAccountMeta,
+    args: CancelOrderParams,
 ) -> Result<()> {
+    let escrow_account = args.escrow_account;
     let escrow = LightAccount::<'_, EscrowAccount>::new_close(
         &crate::ID,
-        &account_meta,
+        &args.account_meta,
         EscrowAccount {
             maker: escrow_account.maker,
             unique_id: escrow_account.unique_id,
@@ -76,16 +86,48 @@ pub fn cancel<'info>(
     )
     .map_err(ProgramError::from)?;
 
-    // NOTE: if the order is not expired then we need the signer check to allow only make the
-    // cancel the order
-    if escrow_account.expired_at > Clock::get()?.unix_timestamp
-        && ctx.accounts.maker.key() != escrow.maker
-    {
-        return Err(error!(ErrorCode::Unauthorized));
+    require!(
+        escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
+        CustomError::InvalidInputMint
+    );
+
+    require!(
+        escrow.tokens.input_token_program == ctx.accounts.input_token_program.key(),
+        ErrorCode::InvalidProgramId
+    );
+
+    require!(
+        escrow_account.maker == ctx.accounts.maker.key(),
+        CustomError::InvalidEscrowMaker
+    );
+
+    require!(
+        *escrow.owner() == crate::ID,
+        ErrorCode::AccountOwnedByWrongProgram
+    );
+
+    let current_timestamp = Clock::get()?.unix_timestamp;
+    let is_expired = escrow_account.expired_at > 0 && current_timestamp > escrow_account.expired_at;
+
+    // For non-expired orders, only maker can cancel
+    // For expired orders, anyone can cancel (cleanup mechanism)
+    if !is_expired {
+        require!(ctx.accounts.maker.is_signer, CustomError::Unauthorized);
     }
 
-    if ctx.accounts.input_mint.key() != escrow.tokens.input_mint {
-        return Err(error!(ErrorCode::InvalidInputMint));
+    let (address, _address_seed) = derive_address(
+        &[
+            b"escrow",
+            escrow_account.unique_id.to_le_bytes().as_ref(),
+            ctx.accounts.maker.key().as_ref(),
+        ],
+        &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
+            .expect("Invalid merkle tree pubkey"),
+        &crate::ID,
+    );
+
+    if address != escrow.address().expect("Invalid escrow address") {
+        return Err(error!(CustomError::InvalidEscrow));
     }
 
     let light_cpi_accounts = CpiAccounts::new(
@@ -95,7 +137,7 @@ pub fn cancel<'info>(
     );
 
     let cpi_inputs = CpiInputs::new(
-        proof,
+        args.proof,
         vec![escrow.to_account_info().map_err(ProgramError::from)?],
     );
 
@@ -118,9 +160,30 @@ pub fn cancel<'info>(
         &signer_seeds,
     );
 
+    emit!(OrderCancelled {
+        maker: ctx.accounts.maker.key(),
+        unique_id: escrow_account.unique_id,
+        input_mint: ctx.accounts.input_mint.key(),
+        output_mint: escrow_account.tokens.output_mint,
+        is_expired,
+        cancelled_by: ctx.accounts.payer.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
     transfer_checked(
         cpi_transfer,
         escrow_account.amount.making_amount,
         ctx.accounts.input_mint.decimals,
     )
+}
+
+#[event]
+pub struct OrderCancelled {
+    pub maker: Pubkey,
+    pub unique_id: u64,
+    pub input_mint: Pubkey,
+    pub output_mint: Pubkey,
+    pub is_expired: bool,
+    pub cancelled_by: Pubkey,
+    pub timestamp: i64,
 }

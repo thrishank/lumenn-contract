@@ -41,7 +41,7 @@ describe("elara", () => {
   const protocol_vault = PublicKey.findProgramAddressSync(
     [Buffer.from("protocol_vault")],
     program.programId
-  )[0];
+  );
 
   const seeds: Uint8Array[] = [
     Buffer.from("escrow"),
@@ -56,10 +56,12 @@ describe("elara", () => {
     "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
 
   const rpc = createRpc(url, url, url);
-  /*
+
   it("init order", async () => {
     console.clear();
     console.log("Initializing order...");
+
+    console.log(protocol_vault);
 
     const proof = await rpc.getValidityProofV0(undefined, [
       {
@@ -80,7 +82,7 @@ describe("elara", () => {
           makingAmount: new BN(1_000_000_000),
           takingAmount: new BN(1_000_000_000),
           expiredAt: null,
-          slippageBps: new BN(100),
+          slippageBps: 100,
         },
         {
           proof: {
@@ -113,7 +115,6 @@ describe("elara", () => {
     console.log("Order initialized  signature:", tx);
   });
 
-*/
   /*
   it("create token account", async () => {
     let compressed_account = await rpc.getCompressedAccount(
@@ -217,6 +218,7 @@ describe("elara", () => {
   });
   */
 
+  /*
   it("Cancel order", async () => {
     console.log("Cancelling order...");
 
@@ -309,6 +311,7 @@ describe("elara", () => {
       .rpc();
     console.log("Order cancelled with transaction signature:", tx);
   });
+  */
 
   /*
   it("Fill order", async () => {

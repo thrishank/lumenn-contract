@@ -11,7 +11,7 @@ use light_sdk::{
     instruction::{PackedAddressTreeInfo, ValidityProof},
 };
 
-use crate::state::EscrowAccount;
+use crate::{error::CustomError, state::EscrowAccount};
 
 #[derive(Accounts)]
 pub struct InitializeOrder<'info> {
@@ -70,12 +70,6 @@ pub struct InitializeOrder<'info> {
 
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-
-    #[account(
-        seeds = [b"event_authority"],
-        bump
-    )]
-    pub event_authority: SystemAccount<'info>,
 }
 
 pub fn init<'info>(
@@ -83,6 +77,26 @@ pub fn init<'info>(
     order_args: InitializeOrderParams,
     light_args: LightArgs,
 ) -> Result<()> {
+    require!(order_args.making_amount > 0, CustomError::InvalidAmount);
+    require!(order_args.taking_amount > 0, CustomError::InvalidAmount);
+
+    require!(
+        order_args.slippage_bps <= 10000,
+        CustomError::InvalidSlippage
+    ); // Max 100%
+
+    require!(
+        ctx.accounts.input_mint.key() != ctx.accounts.output_mint.key(),
+        CustomError::SameMints
+    );
+
+    if let Some(expired_at) = order_args.expired_at {
+        require!(
+            expired_at > Clock::get()?.unix_timestamp,
+            CustomError::InvalidExpiration
+        );
+    }
+
     let light_cpi_accounts = CpiAccounts::new(
         ctx.accounts.payer.as_ref(),
         ctx.remaining_accounts,

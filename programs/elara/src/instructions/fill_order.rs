@@ -1,7 +1,4 @@
-use anchor_lang::{
-    prelude::*,
-    solana_program::{instruction::Instruction, program::invoke_signed},
-};
+use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
@@ -12,7 +9,8 @@ use light_sdk::{
 };
 
 use crate::{
-    error::ErrorCode, idl::types::RoutePlanStep, state::EscrowAccount, PROTOCOL_VAULT_SEED,
+    error::CustomError, idl::types::RoutePlanStep, state::EscrowAccount, swap_cpi,
+    PROTOCOL_VAULT_SEED,
 };
 use jupiter_aggregator::program::Jupiter;
 
@@ -77,13 +75,26 @@ pub fn fill<'info>(
     ctx: Context<'_, '_, '_, 'info, FillOrder<'info>>,
     args: FillOrderParams,
 ) -> Result<()> {
-    if args.swap_data.len() < 8 {
-        return Err(error!(ErrorCode::InvalidJupInstructionData));
-    }
+    require!(
+        args.swap_data.len() >= 8,
+        CustomError::InvalidJupInstructionData
+    );
 
-    if args.escrow_account.maker != ctx.accounts.maker.key() {
-        return Err(error!(ErrorCode::InvalidEscrowMaker));
-    }
+    let escrow_account = &args.escrow_account;
+    require!(
+        escrow_account.maker == ctx.accounts.maker.key(),
+        CustomError::InvalidEscrowMaker
+    );
+
+    require!(
+        escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
+        CustomError::InvalidInputMint
+    );
+
+    require!(
+        escrow_account.tokens.output_mint == ctx.accounts.output_mint.key(),
+        CustomError::InvalidOutputMint
+    );
 
     // FIXME: validate the accounts
     let remaining = &ctx.remaining_accounts;
@@ -111,57 +122,39 @@ pub fn fill<'info>(
                 route_data.slippage_bps,
             )
         }
-        _ => return Err(error!(ErrorCode::InvalidJupInstructionData)),
+        _ => return Err(error!(CustomError::InvalidJupInstructionData)),
     };
 
     if in_amount != escrow_account.amount.making_amount {
-        return Err(error!(ErrorCode::InvalidInAmount));
+        return Err(error!(CustomError::InvalidInAmount));
     }
 
     if quoted_out_amount <= escrow_account.amount.taking_amount {
-        return Err(error!(ErrorCode::LowTakingAmount));
+        return Err(error!(CustomError::LowTakingAmount));
     }
 
     if slippage_bps > escrow_account.slippage_bps {
-        return Err(error!(ErrorCode::SlippageTooHigh));
+        return Err(error!(CustomError::SlippageTooHigh));
     }
 
-    swap_cpi(&ctx, &args.swap_data, jupiter_accounts)?;
-    light_cpi_close(&ctx, args, light_accounts)?;
-    transfer_tokens(&ctx, escrow_account.amount.taking_amount)?;
-    Ok(())
-}
-
-pub fn swap_cpi<'info>(
-    ctx: &Context<'_, '_, '_, 'info, FillOrder<'info>>,
-    swap_data: &[u8],
-    accounts: &[AccountInfo<'info>],
-) -> Result<()> {
-    let account_metas: Vec<AccountMeta> = accounts
-        .iter()
-        .map(|acc| {
-            let is_signer = acc.key == &ctx.accounts.protocol_vault.key();
-            AccountMeta {
-                pubkey: *acc.key,
-                is_signer,
-                is_writable: acc.is_writable,
-            }
-        })
-        .collect();
-
-    // NOTE: hardcode the bump across all the instructions
-    let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
-
-    invoke_signed(
-        &Instruction {
-            program_id: ctx.accounts.jupiter_program.key(),
-            accounts: account_metas,
-            data: swap_data.to_vec(),
-        },
-        accounts,
-        signer_seeds,
+    swap_cpi(
+        &args.swap_data,
+        jupiter_accounts,
+        &ctx.accounts.protocol_vault.to_account_info(),
+        &ctx.accounts.jupiter_program,
     )?;
-
+    light_cpi_close(&ctx, args, light_accounts)?;
+    emit!(FillOrderEvent {
+        maker: escrow_account.maker,
+        input_mint: escrow_account.tokens.input_mint,
+        output_mint: escrow_account.tokens.output_mint,
+        in_amount,
+        out_amount: escrow_account.amount.taking_amount,
+        fee_bps: escrow_account.fee_bps,
+        escrow_account,
+        slippage_bps,
+    });
+    transfer_tokens(&ctx, escrow_account.amount.taking_amount)?;
     Ok(())
 }
 
@@ -235,6 +228,18 @@ pub fn light_cpi_close<'info>(
         .map_err(ProgramError::from)?;
 
     Ok(())
+}
+
+#[event]
+pub struct FillOrderEvent {
+    pub maker: Pubkey,
+    pub input_mint: Pubkey,
+    pub output_mint: Pubkey,
+    pub in_amount: u64,
+    pub out_amount: u64,
+    pub slippage_bps: u16,
+    pub fee_bps: u64,
+    pub escrow_account: EscrowAccount,
 }
 
 // Jupiter route types
