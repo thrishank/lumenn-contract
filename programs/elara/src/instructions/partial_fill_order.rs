@@ -1,7 +1,4 @@
-use anchor_lang::{
-    prelude::*,
-    solana_program::{instruction::Instruction, program::invoke_signed},
-};
+use anchor_lang::prelude::*;
 
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -13,10 +10,8 @@ use light_sdk::{
 };
 
 use crate::{
-    error::CustomError,
-    instructions::{ExactOutRoute, SharedAccountsExactOutRoute},
-    state::EscrowAccount,
-    swap_cpi, PROTOCOL_VAULT_SEED,
+    error::CustomError, parse_jupiter_route_data, state::EscrowAccount, swap_cpi,
+    PROTOCOL_VAULT_SEED,
 };
 use jupiter_aggregator::program::Jupiter;
 
@@ -77,7 +72,7 @@ pub struct PartialFillOrderParams {
     pub taking_amount: u64,
 }
 
-pub fn flash_fill_order<'info>(
+pub fn partial_fill<'info>(
     ctx: Context<'_, '_, '_, 'info, PartialFill<'info>>,
     args: PartialFillOrderParams,
 ) -> Result<()> {
@@ -94,28 +89,17 @@ pub fn flash_fill_order<'info>(
     let light_accounts = &remaining[0..10];
     let jupiter_accounts = &remaining[10..];
 
-    let mut input_data = &args.swap_data[8..];
-    let escrow_account = args.escrow_account;
+    let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
-    let (in_amount, out_amount, slippage_bps) = match args.swap_data[0] {
-        208 => {
-            let route_data = ExactOutRoute::deserialize(&mut input_data)?;
-            (
-                route_data.quoted_in_amount,
-                route_data.out_amount,
-                route_data.slippage_bps,
-            )
-        }
-        176 => {
-            let route_data = SharedAccountsExactOutRoute::deserialize(&mut input_data)?;
-            (
-                route_data.quoted_in_amount,
-                route_data.out_amount,
-                route_data.slippage_bps,
-            )
-        }
-        _ => return Err(error!(CustomError::InvalidJupInstructionData)),
-    };
+    if !jup_data.is_exact_out {
+        return Err(error!(CustomError::InvalidJupInstructionData));
+    }
+
+    let out_amount = jup_data.out_amount;
+    let in_amount = jup_data.in_amount;
+    let slippage_bps = jup_data.slippage_bps;
+
+    let escrow_account = args.escrow_account;
 
     if out_amount != args.taking_amount {
         return Err(error!(CustomError::InvalidOutAmount));
@@ -135,8 +119,10 @@ pub fn flash_fill_order<'info>(
         &ctx.accounts.protocol_vault.to_account_info(),
         &ctx.accounts.jupiter_program,
     )?;
+
     light_cpi(&ctx, light_accounts, &args, in_amount, out_amount)?;
     transfer_tokens(&ctx, out_amount)?;
+
     emit!(PartialFillOrderEvent {
         maker: ctx.accounts.maker.key(),
         input_mint: escrow_account.tokens.input_mint,

@@ -13,11 +13,9 @@ use jupiter_aggregator::program::Jupiter;
 declare_program!(jupiter_aggregator);
 declare_program!(idl);
 
+use crate::parse_jupiter_route_data;
 use crate::{
-    error::CustomError,
-    instructions::{ExactOutRoute, SharedAccountsExactOutRoute},
-    state::EscrowAccount,
-    swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
+    error::CustomError, state::EscrowAccount, swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
 
 #[derive(Accounts)]
@@ -73,38 +71,27 @@ pub fn create_token_account<'info>(
     let light_accounts = &remaining[0..10];
     let jupiter_accounts = &remaining[10..];
 
-    let mut input_data = &args.swap_data[8..];
-    let disc = args.swap_data[0];
-    // FIX: add the full discriminator check
-    match disc {
-        208 => {
-            let swap_data = ExactOutRoute::deserialize(&mut input_data)?;
-            if swap_data.out_amount != 2039280 {
-                return Err(error!(CustomError::InvalidOutAmount));
-            }
-            swap_cpi(
-                &args.swap_data,
-                jupiter_accounts,
-                &ctx.accounts.jupiter_program,
-                &ctx.accounts.protocol_vault.to_account_info(),
-            )?;
-            light_cpi(&ctx, light_accounts, &args, swap_data.quoted_in_amount)?;
-            create_associated_token_account(&ctx)?;
-        }
-        176 => {
-            let swap_data = SharedAccountsExactOutRoute::deserialize(&mut input_data)?;
-            if swap_data.out_amount != 2039280 {
-                return Err(error!(CustomError::InvalidOutAmount));
-            }
-            // Self::swap_cpi(&ctx, &data, jupiter_accounts)?;
-            light_cpi(&ctx, light_accounts, &args, swap_data.quoted_in_amount)?;
-            create_associated_token_account(&ctx)?;
-        }
-        _ => {
-            return Err(error!(CustomError::InvalidJupInstructionData));
-        }
+    let jup_data = parse_jupiter_route_data(&args.swap_data)?;
+    if jup_data.out_amount != 2039280 {
+        return Err(error!(CustomError::InvalidOutAmount));
     }
 
+    if !jup_data.is_exact_out {
+        return Err(error!(CustomError::InvalidJupInstructionData));
+    }
+
+    if jup_data.slippage_bps < 101 {
+        return Err(error!(CustomError::SlippageTooHigh));
+    }
+
+    swap_cpi(
+        &args.swap_data,
+        jupiter_accounts,
+        &ctx.accounts.jupiter_program,
+        &ctx.accounts.protocol_vault.to_account_info(),
+    )?;
+    light_cpi(&ctx, light_accounts, &args, jup_data.in_amount)?;
+    create_associated_token_account(&ctx)?;
     Ok(())
 }
 

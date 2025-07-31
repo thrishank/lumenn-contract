@@ -9,8 +9,8 @@ use light_sdk::{
 };
 
 use crate::{
-    error::CustomError, idl::types::RoutePlanStep, state::EscrowAccount, swap_cpi,
-    PROTOCOL_VAULT_SEED,
+    error::CustomError, idl::types::RoutePlanStep, parse_jupiter_route_data, state::EscrowAccount,
+    swap_cpi, PROTOCOL_VAULT_SEED,
 };
 use jupiter_aggregator::program::Jupiter;
 
@@ -101,39 +101,21 @@ pub fn fill<'info>(
     let light_accounts = &remaining[0..10];
     let jupiter_accounts = &remaining[10..];
 
-    let mut input_data = &args.swap_data[8..];
+    let jup_data = parse_jupiter_route_data(&args.swap_data)?;
+
+    let in_amount = jup_data.in_amount;
+    let out_amount = jup_data.out_amount;
+
     let escrow_account = args.escrow_account;
-
-    // FIXME: match the full route discrimator all 8 bytes
-    let (in_amount, quoted_out_amount, slippage_bps) = match args.swap_data[0] {
-        229 => {
-            let route_data = Route::deserialize(&mut input_data)?;
-            (
-                route_data.in_amount,
-                route_data.quoted_out_amount,
-                route_data.slippage_bps,
-            )
-        }
-        193 => {
-            let route_data = SharedAccountsRoute::deserialize(&mut input_data)?;
-            (
-                route_data.in_amount,
-                route_data.quoted_out_amount,
-                route_data.slippage_bps,
-            )
-        }
-        _ => return Err(error!(CustomError::InvalidJupInstructionData)),
-    };
-
     if in_amount != escrow_account.amount.making_amount {
         return Err(error!(CustomError::InvalidInAmount));
     }
 
-    if quoted_out_amount <= escrow_account.amount.taking_amount {
+    if out_amount <= escrow_account.amount.taking_amount {
         return Err(error!(CustomError::LowTakingAmount));
     }
 
-    if slippage_bps > escrow_account.slippage_bps {
+    if jup_data.slippage_bps > escrow_account.slippage_bps {
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
@@ -143,7 +125,9 @@ pub fn fill<'info>(
         &ctx.accounts.protocol_vault.to_account_info(),
         &ctx.accounts.jupiter_program,
     )?;
+
     light_cpi_close(&ctx, args, light_accounts)?;
+
     emit!(FillOrderEvent {
         maker: escrow_account.maker,
         input_mint: escrow_account.tokens.input_mint,
@@ -152,9 +136,10 @@ pub fn fill<'info>(
         out_amount: escrow_account.amount.taking_amount,
         fee_bps: escrow_account.fee_bps,
         escrow_account,
-        slippage_bps,
     });
+
     transfer_tokens(&ctx, escrow_account.amount.taking_amount)?;
+
     Ok(())
 }
 
@@ -237,7 +222,6 @@ pub struct FillOrderEvent {
     pub output_mint: Pubkey,
     pub in_amount: u64,
     pub out_amount: u64,
-    pub slippage_bps: u16,
     pub fee_bps: u64,
     pub escrow_account: EscrowAccount,
 }

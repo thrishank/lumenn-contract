@@ -16,6 +16,8 @@ pub mod state;
 pub use constants::*;
 use instructions::*;
 
+use crate::error::CustomError;
+
 #[program]
 pub mod elara {
 
@@ -40,6 +42,11 @@ pub mod elara {
         cancel_order::cancel(ctx, args)
     }
 
+    // fill the order when the price reaches the user target
+    // this instruction will be called a worker that is monitoring the price
+    // swap the token in vault using jupiter cpi
+    // close the light compressed escrow account
+    // transfer the output tokens to the maker
     pub fn fill_order<'info>(
         ctx: Context<'_, '_, '_, 'info, FillOrder<'info>>,
         args: FillOrderParams,
@@ -47,11 +54,19 @@ pub mod elara {
         fill_order::fill(ctx, args)
     }
 
-    pub fn partial_fill(ctx: Context<FillOrder>, data: Vec<u8>) -> Result<()> {
-        // flash fill
-        Ok(())
+    // partial fill the order when the price reaches the user target
+    // used when there is limited liquidity in the market
+    // light compressed escrow account state udpated not closed
+    pub fn partial_fill<'info>(
+        ctx: Context<'_, '_, '_, 'info, PartialFill<'info>>,
+        args: PartialFillOrderParams,
+    ) -> Result<()> {
+        partial_fill_order::partial_fill(ctx, args)
     }
 
+    // to send the output tokens to the maker, maker needs to have an associated token account
+    // usallay created when initializing the order but if they close we create it
+    // take samll amount from the making amount and swap it SOL and create the ATA
     pub fn create_ata<'info>(
         ctx: Context<'_, '_, '_, 'info, CreateToken<'info>>,
         args: CreateTokenAccountArgs,
@@ -91,4 +106,68 @@ pub fn swap_cpi<'info>(
     )?;
 
     Ok(())
+}
+
+#[derive(Debug)]
+pub struct RouteAmounts {
+    pub in_amount: u64,
+    pub out_amount: u64,
+    pub slippage_bps: u16,
+    pub is_exact_out: bool,
+}
+
+pub fn parse_jupiter_route_data(data: &[u8]) -> Result<RouteAmounts> {
+    if data.len() < 8 {
+        return Err(error!(CustomError::InvalidJupInstructionData));
+    }
+
+    let discriminator = &data[0..8];
+    let mut input_data = &data[8..];
+
+    if discriminator == discriminators::EXACT_OUT_ROUTE {
+        let route_data = ExactOutRoute::deserialize(&mut input_data)?;
+        Ok(RouteAmounts {
+            in_amount: route_data.quoted_in_amount,
+            out_amount: route_data.out_amount,
+            slippage_bps: route_data.slippage_bps,
+            is_exact_out: true,
+        })
+    } else if discriminator == discriminators::SHARED_ACCOUNTS_EXACT_OUT_ROUTE {
+        let route_data = SharedAccountsExactOutRoute::deserialize(&mut input_data)?;
+        Ok(RouteAmounts {
+            in_amount: route_data.quoted_in_amount,
+            out_amount: route_data.out_amount,
+            slippage_bps: route_data.slippage_bps,
+            is_exact_out: true,
+        })
+    } else if discriminator == discriminators::ROUTE {
+        let route_data = Route::deserialize(&mut input_data)?;
+        Ok(RouteAmounts {
+            in_amount: route_data.in_amount,
+            out_amount: route_data.quoted_out_amount,
+            slippage_bps: route_data.slippage_bps,
+            is_exact_out: false,
+        })
+    } else if discriminator == discriminators::SHARED_ACCOUNTS_ROUTE {
+        let route_data = SharedAccountsRoute::deserialize(&mut input_data)?;
+        Ok(RouteAmounts {
+            in_amount: route_data.in_amount,
+            out_amount: route_data.quoted_out_amount,
+            slippage_bps: route_data.slippage_bps,
+            is_exact_out: false,
+        })
+    } else {
+        Err(error!(CustomError::InvalidJupInstructionData))
+    }
+}
+
+// Full discriminator constants for reference
+pub mod discriminators {
+    pub const EXACT_OUT_ROUTE: [u8; 8] = [208, 51, 239, 151, 123, 43, 237, 92];
+
+    pub const ROUTE: [u8; 8] = [229, 23, 203, 151, 122, 227, 173, 42];
+
+    pub const SHARED_ACCOUNTS_EXACT_OUT_ROUTE: [u8; 8] = [176, 209, 105, 168, 154, 125, 69, 62];
+
+    pub const SHARED_ACCOUNTS_ROUTE: [u8; 8] = [193, 32, 155, 51, 65, 214, 156, 129];
 }
