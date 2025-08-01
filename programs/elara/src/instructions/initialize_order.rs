@@ -142,6 +142,9 @@ pub fn init<'info>(
     escrow.created_at = Clock::get()?.unix_timestamp;
     escrow.updated_at = Clock::get()?.unix_timestamp;
 
+    let escrow_address =
+        Pubkey::new_from_array((*escrow.address()).expect("Address should be valid"));
+
     let cpi = CpiInputs::new_with_address(
         light_args.proof,
         vec![escrow.to_account_info().map_err(ProgramError::from)?],
@@ -150,8 +153,8 @@ pub fn init<'info>(
 
     cpi.invoke_light_system_program(light_cpi_accounts)
         .map_err(ProgramError::from)?;
-
     emit!(OrderInitialized {
+        escrow_address,
         maker: ctx.accounts.maker.key(),
         unique_id: order_args.unique_id,
         input_mint: ctx.accounts.input_mint.key(),
@@ -199,6 +202,7 @@ pub struct LightArgs {
 
 #[event]
 pub struct OrderInitialized {
+    pub escrow_address: Pubkey,
     pub maker: Pubkey,
     pub unique_id: u64,
     pub input_mint: Pubkey,

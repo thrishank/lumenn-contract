@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use light_sdk::{LightDiscriminator, LightHasher};
-
+// TODO: add the merkle tree that is used to derive the PDA in the state
 #[derive(
     Debug, Clone, Copy, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher,
 )]
