@@ -138,6 +138,11 @@ pub fn fill<'info>(
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
+    // hard coded 0.05%
+    if jup_data.platform_fee_bps != 5 {
+        return Err(error!(CustomError::InvalidPlatformFeeBps));
+    }
+
     swap_cpi(
         &args.swap_data,
         jupiter_accounts,

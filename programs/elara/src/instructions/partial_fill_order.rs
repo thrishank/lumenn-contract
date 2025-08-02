@@ -125,6 +125,10 @@ pub fn partial_fill<'info>(
 
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
+    if jup_data.platform_fee_bps != 5 {
+        return Err(error!(CustomError::InvalidPlatformFeeBps));
+    }
+
     if !jup_data.is_exact_out {
         return Err(error!(CustomError::InvalidJupInstructionData));
     }

@@ -46,4 +46,6 @@ pub enum CustomError {
     MathOverflow,
     #[msg("Invalid escrow address")]
     InvalidEscrow,
+    #[msg("Invalid platform fee bps should be either 5 or 0")]
+    InvalidPlatformFeeBps,
 }

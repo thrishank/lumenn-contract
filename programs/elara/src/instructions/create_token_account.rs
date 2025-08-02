@@ -86,6 +86,10 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
+    if jup_data.platform_fee_bps != 0 {
+        return Err(error!(CustomError::InvalidPlatformFeeBps));
+    }
+
     /*
     swap_cpi(
         &args.swap_data,

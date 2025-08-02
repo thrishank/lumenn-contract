@@ -121,6 +121,7 @@ describe("elara", () => {
   });
 
   it("create token account", async () => {
+    console.log("closing account for testing...");
     const ata = new PublicKey("EyV9cjPNjgp5f3QioFkqDrA8SfjhMau8qNNGzUtKvMYT");
     const ixs = createCloseAccountInstruction(
       ata,

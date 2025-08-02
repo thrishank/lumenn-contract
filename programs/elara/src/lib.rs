@@ -112,6 +112,7 @@ pub struct RouteAmounts {
     pub in_amount: u64,
     pub out_amount: u64,
     pub slippage_bps: u16,
+    pub platform_fee_bps: u8,
     pub is_exact_out: bool,
 }
 
@@ -129,6 +130,7 @@ pub fn parse_jupiter_route_data(data: &[u8]) -> Result<RouteAmounts> {
             in_amount: route_data.quoted_in_amount,
             out_amount: route_data.out_amount,
             slippage_bps: route_data.slippage_bps,
+            platform_fee_bps: route_data.platform_fee_bps,
             is_exact_out: true,
         })
     } else if discriminator == discriminators::SHARED_ACCOUNTS_EXACT_OUT_ROUTE {
@@ -137,6 +139,7 @@ pub fn parse_jupiter_route_data(data: &[u8]) -> Result<RouteAmounts> {
             in_amount: route_data.quoted_in_amount,
             out_amount: route_data.out_amount,
             slippage_bps: route_data.slippage_bps,
+            platform_fee_bps: route_data.platform_fee_bps,
             is_exact_out: true,
         })
     } else if discriminator == discriminators::ROUTE {
@@ -145,6 +148,7 @@ pub fn parse_jupiter_route_data(data: &[u8]) -> Result<RouteAmounts> {
             in_amount: route_data.in_amount,
             out_amount: route_data.quoted_out_amount,
             slippage_bps: route_data.slippage_bps,
+            platform_fee_bps: route_data.platform_fee_bps,
             is_exact_out: false,
         })
     } else if discriminator == discriminators::SHARED_ACCOUNTS_ROUTE {
@@ -153,6 +157,7 @@ pub fn parse_jupiter_route_data(data: &[u8]) -> Result<RouteAmounts> {
             in_amount: route_data.in_amount,
             out_amount: route_data.quoted_out_amount,
             slippage_bps: route_data.slippage_bps,
+            platform_fee_bps: route_data.platform_fee_bps,
             is_exact_out: false,
         })
     } else {
