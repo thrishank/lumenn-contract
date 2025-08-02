@@ -159,6 +159,8 @@ pub fn init<'info>(
         unique_id: order_args.unique_id,
         input_mint: ctx.accounts.input_mint.key(),
         output_mint: ctx.accounts.output_mint.key(),
+        input_mint_decimals: ctx.accounts.input_mint.decimals,
+        output_mint_decimals: ctx.accounts.output_mint.decimals,
         making_amount: order_args.making_amount,
         taking_amount: order_args.taking_amount,
         slippage_bps: order_args.slippage_bps,
@@ -200,6 +202,7 @@ pub struct LightArgs {
     pub output_state_tree_index: u8,
 }
 
+// TODO: add decimals and create a instruction and self invoke for emit
 #[event]
 pub struct OrderInitialized {
     pub escrow_address: Pubkey,
@@ -207,6 +210,8 @@ pub struct OrderInitialized {
     pub unique_id: u64,
     pub input_mint: Pubkey,
     pub output_mint: Pubkey,
+    pub input_mint_decimals: u8,
+    pub output_mint_decimals: u8,
     pub making_amount: u64,
     pub taking_amount: u64,
     pub slippage_bps: u16,

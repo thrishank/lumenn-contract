@@ -1,4 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
+import { createCloseAccountInstruction } from "@solana/spl-token";
 import axios from "axios";
 import { Program } from "@coral-xyz/anchor";
 import { Elara } from "../target/types/elara";
@@ -7,6 +8,7 @@ import {
   Keypair,
   PublicKey,
   Signer,
+  Transaction,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
 import { TOKEN_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
@@ -22,6 +24,7 @@ import {
   CLOSE_ACCOUNTS,
   INIT_REMAINING_ACCOUNTS,
 } from "./address";
+import { parseEscrowFromBuffer } from "./fn";
 
 describe("elara", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -32,12 +35,20 @@ describe("elara", () => {
   const input_mint = new PublicKey(
     "J7LM6p22Ef8VhREZzkLToSADrXhAiiQUn3P2BAwo1RSe"
   );
+
   const output_mint = new PublicKey(
     "9RzWC4ZS6LdNUP2LwaY7Ztq5sTxgt3dFLp2jjokhm9Vz"
   );
 
-  // const unique_id = new anchor.BN(Date.now());
-  const unique_id = new anchor.BN(143242234);
+  const url =
+    "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
+
+  const indexer = "http://34.69.251.52:8784";
+
+  const rpc = createRpc(url, indexer, url);
+
+  const unique_id = new anchor.BN(Date.now());
+  // const unique_id = new anchor.BN(32343343);
   const protocol_vault = PublicKey.findProgramAddressSync(
     [Buffer.from("protocol_vault")],
     program.programId
@@ -52,16 +63,13 @@ describe("elara", () => {
   const assetSeed = deriveAddressSeed(seeds, program.programId);
   const address = deriveAddress(assetSeed, ADDRESS_TREE);
 
-  const url =
-    "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
-
-  const rpc = createRpc(url, url, url);
-
   it("init order", async () => {
     console.clear();
-    console.log("Initializing order...");
 
-    console.log(protocol_vault);
+    console.log("protocol_vault", protocol_vault.toString());
+    console.log("escrow address", address.toString());
+
+    console.log("Initializing order...");
 
     const proof = await rpc.getValidityProofV0(undefined, [
       {
@@ -70,8 +78,6 @@ describe("elara", () => {
         queue: ADDRESS_QUEUE,
       },
     ]);
-
-    console.log(proof);
 
     const validityProof = proof.compressedProof;
 
@@ -115,8 +121,21 @@ describe("elara", () => {
     console.log("Order initialized  signature:", tx);
   });
 
-  /*
   it("create token account", async () => {
+    const ata = new PublicKey("EyV9cjPNjgp5f3QioFkqDrA8SfjhMau8qNNGzUtKvMYT");
+    const ixs = createCloseAccountInstruction(
+      ata,
+      payer.publicKey,
+      payer.publicKey,
+      [],
+      TOKEN_PROGRAM_ID
+    );
+
+    const transaction = new Transaction().add(ixs);
+    const signature = await rpc.sendTransaction(transaction, [payer]);
+    console.log("closed account for testing:", signature);
+
+    console.log("Creating token account...");
     let compressed_account = await rpc.getCompressedAccount(
       bn(address.toBytes())
     );
@@ -131,52 +150,33 @@ describe("elara", () => {
     const validityProof = proof.compressedProof;
 
     const buffer = compressed_account?.data?.data!;
-
-    const maker_bytes = buffer.slice(0, 32);
-    const unique_id = buffer.readBigUInt64LE(32);
-
-    const input_mint_bytes = buffer.slice(40, 72);
-    const output_mint = buffer.slice(72, 104);
-    const input_token_program = buffer.slice(104, 136);
-    const output_token_program = buffer.slice(136, 168);
-
-    const ori_making_amount = buffer.readBigUInt64LE(168);
-    const ori_taking_amount = buffer.readBigUInt64LE(176);
-    const making_amount = buffer.readBigUInt64LE(184);
-    const taking_amount = buffer.readBigUInt64LE(192);
-
-    const slippage_bps = buffer.readBigUInt64LE(200);
-    const fee_bps = buffer.readBigUInt64LE(208);
-    const expired_at = buffer.readBigInt64LE(216);
-    const created_at = buffer.readBigInt64LE(224);
-    const updated_at = buffer.readBigInt64LE(232);
+    let escrow_data = parseEscrowFromBuffer(buffer);
 
     const swap = await get_swap("372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j");
-    console.log(swap);
 
     const tx = await program.methods
       .createAta({
         swapData: Buffer.from(swap.swapInstruction.data, "base64"),
         escrowAccount: {
-          maker: new PublicKey(maker_bytes),
-          uniqueId: new BN(unique_id),
+          maker: escrow_data.maker,
+          uniqueId: escrow_data.uniqueId,
           tokens: {
-            inputMint: new PublicKey(input_mint_bytes),
-            outputMint: new PublicKey(output_mint),
-            inputTokenProgram: new PublicKey(input_token_program),
-            outputTokenProgram: new PublicKey(output_token_program),
+            inputMint: escrow_data.tokens.inputMint,
+            outputMint: escrow_data.tokens.outputMint,
+            inputTokenProgram: escrow_data.tokens.inputTokenProgram,
+            outputTokenProgram: escrow_data.tokens.outputTokenProgram,
           },
           amount: {
-            makingAmount: new BN(making_amount),
-            takingAmount: new BN(taking_amount),
-            oriMakingAmount: new BN(ori_making_amount),
-            oriTakingAmount: new BN(ori_taking_amount),
+            makingAmount: escrow_data.amount.makingAmount,
+            takingAmount: escrow_data.amount.takingAmount,
+            oriMakingAmount: escrow_data.amount.oriMakingAmount,
+            oriTakingAmount: escrow_data.amount.oriTakingAmount,
           },
-          expiredAt: new BN(expired_at),
-          slippageBps: new BN(slippage_bps),
-          feeBps: new BN(fee_bps),
-          createdAt: new BN(created_at),
-          updatedAt: new BN(updated_at),
+          expiredAt: escrow_data.expiredAt,
+          slippageBps: escrow_data.slippageBps,
+          feeBps: escrow_data.feeBps,
+          createdAt: escrow_data.createdAt,
+          updatedAt: escrow_data.updatedAt,
         },
         proof: {
           0: {
@@ -203,7 +203,7 @@ describe("elara", () => {
         makerTokenAta: new PublicKey(
           "EyV9cjPNjgp5f3QioFkqDrA8SfjhMau8qNNGzUtKvMYT"
         ),
-        mint: input_mint,
+        mint: output_mint,
         tokenProgram: TOKEN_PROGRAM_ID,
         jupiterProgram: new PublicKey(
           "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
@@ -214,11 +214,9 @@ describe("elara", () => {
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
       ])
       .rpc();
-    console.log("Order cancelled with transaction signature:", tx);
+    console.log("signature:", tx);
   });
-  */
 
-  /*
   it("Cancel order", async () => {
     console.log("Cancelling order...");
 
@@ -236,57 +234,39 @@ describe("elara", () => {
     const validityProof = proof.compressedProof;
 
     const buffer = compressed_account?.data?.data!;
-
-    const maker_bytes = buffer.slice(0, 32);
-    const unique_id = buffer.readBigUInt64LE(32);
-
-    const input_mint_bytes = buffer.slice(40, 72);
-    const output_mint = buffer.slice(72, 104);
-    const input_token_program = buffer.slice(104, 136);
-    const output_token_program = buffer.slice(136, 168);
-
-    const ori_making_amount = buffer.readBigUInt64LE(168);
-    const ori_taking_amount = buffer.readBigUInt64LE(176);
-    const making_amount = buffer.readBigUInt64LE(184);
-    const taking_amount = buffer.readBigUInt64LE(192);
-
-    const slippage_bps = buffer.readBigUInt64LE(200);
-    const fee_bps = buffer.readBigUInt64LE(208);
-    const expired_at = buffer.readBigInt64LE(216);
-    const created_at = buffer.readBigInt64LE(224);
-    const updated_at = buffer.readBigInt64LE(232);
+    let escrow_data = parseEscrowFromBuffer(buffer);
 
     const tx = await program.methods
-      .cancelOrder(
-        {
-          maker: new PublicKey(maker_bytes),
-          uniqueId: new BN(unique_id),
+      .cancelOrder({
+        escrowAccount: {
+          maker: escrow_data.maker,
+          uniqueId: escrow_data.uniqueId,
           tokens: {
-            inputMint: new PublicKey(input_mint_bytes),
-            outputMint: new PublicKey(output_mint),
-            inputTokenProgram: new PublicKey(input_token_program),
-            outputTokenProgram: new PublicKey(output_token_program),
+            inputMint: escrow_data.tokens.inputMint,
+            outputMint: escrow_data.tokens.outputMint,
+            inputTokenProgram: escrow_data.tokens.inputTokenProgram,
+            outputTokenProgram: escrow_data.tokens.outputTokenProgram,
           },
           amount: {
-            makingAmount: new BN(making_amount),
-            takingAmount: new BN(taking_amount),
-            oriMakingAmount: new BN(ori_making_amount),
-            oriTakingAmount: new BN(ori_taking_amount),
+            makingAmount: escrow_data.amount.makingAmount,
+            takingAmount: escrow_data.amount.takingAmount,
+            oriMakingAmount: escrow_data.amount.oriMakingAmount,
+            oriTakingAmount: escrow_data.amount.oriTakingAmount,
           },
-          expiredAt: new BN(expired_at),
-          slippageBps: new BN(slippage_bps),
-          feeBps: new BN(fee_bps),
-          createdAt: new BN(created_at),
-          updatedAt: new BN(updated_at),
+          expiredAt: escrow_data.expiredAt,
+          slippageBps: escrow_data.slippageBps,
+          feeBps: escrow_data.feeBps,
+          createdAt: escrow_data.createdAt,
+          updatedAt: escrow_data.updatedAt,
         },
-        {
+        proof: {
           0: {
             a: validityProof.a,
             b: validityProof.b,
             c: validityProof.c,
           },
         },
-        {
+        accountMeta: {
           address: compressed_account.address,
           treeInfo: {
             rootIndex: proof.rootIndices[0],
@@ -296,8 +276,8 @@ describe("elara", () => {
             leafIndex: compressed_account.leafIndex,
           },
           outputStateTreeIndex: 0,
-        }
-      )
+        },
+      })
       .accounts({
         payer: payer.publicKey,
         maker: payer.publicKey,
@@ -311,7 +291,6 @@ describe("elara", () => {
       .rpc();
     console.log("Order cancelled with transaction signature:", tx);
   });
-  */
 
   /*
   it("Fill order", async () => {
@@ -352,7 +331,7 @@ describe("elara", () => {
 
 async function get_swap(address: string) {
   const quote_url =
-    "https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB&amount=10000";
+    "https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB&amount=2039280&swapMode=ExactOut";
   const quote = await axios.get(quote_url);
   console.log("quote in amount", quote.data.inAmount);
   console.log("quote out amount", quote.data.outAmount);

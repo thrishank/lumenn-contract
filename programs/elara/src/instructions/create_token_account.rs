@@ -29,9 +29,11 @@ pub struct CreateToken<'info> {
     pub mint: InterfaceAccount<'info, Mint>,
 
     /// CHECK: check in program logic
+    #[account(mut)]
     pub maker_token_ata: UncheckedAccount<'info>,
 
     #[account(
+        mut,
         seeds = [b"protocol_vault"],
         bump
     )]
@@ -80,16 +82,18 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::InvalidJupInstructionData));
     }
 
-    if jup_data.slippage_bps < 101 {
+    if jup_data.slippage_bps > 101 {
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
+    /*
     swap_cpi(
         &args.swap_data,
         jupiter_accounts,
         &ctx.accounts.jupiter_program,
         &ctx.accounts.protocol_vault.to_account_info(),
     )?;
+    */
     light_cpi(&ctx, light_accounts, &args, jup_data.in_amount)?;
     create_associated_token_account(&ctx)?;
     Ok(())

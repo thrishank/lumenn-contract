@@ -30,6 +30,12 @@ pub struct FillOrder<'info> {
 
     pub output_mint: InterfaceAccount<'info, Mint>,
 
+    #[account(
+        mut,
+        associated_token::mint = output_mint,
+        associated_token::authority = maker,
+        associated_token::token_program = output_token_program
+    )]
     pub maker_output_mint_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
