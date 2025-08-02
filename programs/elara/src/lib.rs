@@ -3,7 +3,6 @@ use anchor_lang::solana_program::{instruction::Instruction, program::invoke_sign
 use light_sdk::{cpi::CpiSigner, derive_light_cpi_signer};
 
 declare_id!("4LhEEtzAhM6wEXJR2YQHPEs79UEx8e6HncmeHbqbW1w1");
-declare_program!(jupiter_aggregator);
 
 pub const LIGHT_CPI_SIGNER: CpiSigner =
     derive_light_cpi_signer!("4LhEEtzAhM6wEXJR2YQHPEs79UEx8e6HncmeHbqbW1w1");

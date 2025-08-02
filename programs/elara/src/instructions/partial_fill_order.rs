@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 
 use anchor_spl::{
@@ -6,6 +8,7 @@ use anchor_spl::{
 };
 use light_sdk::{
     account::LightAccount,
+    address::v1::derive_address,
     instruction::{account_meta::CompressedAccountMeta, ValidityProof},
 };
 
@@ -13,9 +16,10 @@ use crate::{
     error::CustomError, parse_jupiter_route_data, state::EscrowAccount, swap_cpi,
     PROTOCOL_VAULT_SEED,
 };
-use jupiter_aggregator::program::Jupiter;
 
-declare_program!(jupiter_aggregator);
+use jupiter::program::Jupiter;
+
+declare_program!(jupiter);
 
 #[derive(Accounts)]
 pub struct PartialFill<'info> {
@@ -82,13 +86,37 @@ pub fn partial_fill<'info>(
     ctx: Context<'_, '_, '_, 'info, PartialFill<'info>>,
     args: PartialFillOrderParams,
 ) -> Result<()> {
-    if args.swap_data.len() < 8 {
-        return Err(error!(CustomError::InvalidJupInstructionData));
-    }
+    require!(
+        args.swap_data.len() >= 8,
+        CustomError::InvalidJupInstructionData
+    );
 
-    if args.escrow_account.maker != ctx.accounts.maker.key() {
-        return Err(error!(CustomError::InvalidEscrowMaker));
-    }
+    let escrow_account = &args.escrow_account;
+
+    require!(
+        escrow_account.maker == ctx.accounts.maker.key(),
+        CustomError::InvalidEscrowMaker
+    );
+
+    require!(
+        escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
+        CustomError::InvalidInputMint
+    );
+
+    require!(
+        escrow_account.tokens.input_token_program == ctx.accounts.input_token_program.key(),
+        ErrorCode::InvalidProgramId
+    );
+
+    require!(
+        escrow_account.tokens.output_mint == ctx.accounts.output_mint.key(),
+        CustomError::InvalidOutputMint
+    );
+
+    require!(
+        escrow_account.tokens.output_token_program == ctx.accounts.output_token_program.key(),
+        ErrorCode::InvalidProgramId
+    );
 
     // FIXME: validate the accounts
     let remaining = &ctx.remaining_accounts;
@@ -126,10 +154,11 @@ pub fn partial_fill<'info>(
         &ctx.accounts.jupiter_program,
     )?;
 
-    light_cpi(&ctx, light_accounts, &args, in_amount, out_amount)?;
+    let escrow_address = light_cpi(&ctx, light_accounts, &args, in_amount, out_amount)?;
     transfer_tokens(&ctx, out_amount)?;
 
     emit!(PartialFillOrderEvent {
+        escrow_address,
         maker: ctx.accounts.maker.key(),
         input_mint: escrow_account.tokens.input_mint,
         output_mint: escrow_account.tokens.output_mint,
@@ -137,7 +166,6 @@ pub fn partial_fill<'info>(
         in_amount,
         out_amount,
         fee_bps: escrow_account.fee_bps,
-        escrow_account,
     });
     Ok(())
 }
@@ -178,7 +206,7 @@ pub fn light_cpi<'info>(
     args: &PartialFillOrderParams,
     making_amount: u64,
     taking_amount: u64,
-) -> Result<()> {
+) -> Result<Pubkey> {
     let escrow_account = args.escrow_account;
 
     let mut escrow = LightAccount::<'_, EscrowAccount>::new_mut(
@@ -197,6 +225,26 @@ pub fn light_cpi<'info>(
         },
     )
     .map_err(ProgramError::from)?;
+
+    require!(
+        *escrow.owner() == crate::ID,
+        ErrorCode::AccountOwnedByWrongProgram
+    );
+
+    let (address, _address_seed) = derive_address(
+        &[
+            b"escrow",
+            escrow_account.unique_id.to_le_bytes().as_ref(),
+            ctx.accounts.maker.key().as_ref(),
+        ],
+        &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
+            .expect("Invalid merkle tree pubkey"),
+        &crate::ID,
+    );
+
+    if address != escrow.address().expect("Invalid escrow address") {
+        return Err(error!(CustomError::InvalidEscrow));
+    }
 
     escrow.amount.making_amount = escrow
         .amount
@@ -218,6 +266,9 @@ pub fn light_cpi<'info>(
         crate::LIGHT_CPI_SIGNER,
     );
 
+    let escrow_address =
+        Pubkey::new_from_array((*escrow.address()).expect("Address should be valid"));
+
     let cpi_inputs = light_sdk::cpi::CpiInputs::new(
         args.proof,
         vec![escrow.to_account_info().map_err(ProgramError::from)?],
@@ -226,12 +277,12 @@ pub fn light_cpi<'info>(
     cpi_inputs
         .invoke_light_system_program(cpi_accounts)
         .map_err(ProgramError::from)?;
-
-    Ok(())
+    Ok(escrow_address)
 }
 
 #[event]
 pub struct PartialFillOrderEvent {
+    pub escrow_address: Pubkey,
     pub maker: Pubkey,
     pub input_mint: Pubkey,
     pub output_mint: Pubkey,
@@ -239,5 +290,4 @@ pub struct PartialFillOrderEvent {
     pub out_amount: u64,
     pub slippage_bps: u16,
     pub fee_bps: u64,
-    pub escrow_account: EscrowAccount,
 }

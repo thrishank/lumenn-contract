@@ -202,7 +202,7 @@ pub struct LightArgs {
     pub output_state_tree_index: u8,
 }
 
-// TODO: add decimals and create a instruction and self invoke for emit
+// TODO: create a instruction and self invoke for emit
 #[event]
 pub struct OrderInitialized {
     pub escrow_address: Pubkey,

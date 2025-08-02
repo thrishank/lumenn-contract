@@ -5,7 +5,6 @@ import { Program } from "@coral-xyz/anchor";
 import { Elara } from "../target/types/elara";
 import {
   ComputeBudgetProgram,
-  Keypair,
   PublicKey,
   Signer,
   Transaction,

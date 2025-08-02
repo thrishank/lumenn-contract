@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -5,17 +7,17 @@ use anchor_spl::{
 };
 use light_sdk::{
     account::LightAccount,
+    address::v1::derive_address,
     instruction::{account_meta::CompressedAccountMeta, ValidityProof},
 };
 
 use crate::{
-    error::CustomError, idl::types::RoutePlanStep, parse_jupiter_route_data, state::EscrowAccount,
-    swap_cpi, PROTOCOL_VAULT_SEED,
+    error::CustomError, jupiter::types::RoutePlanStep, parse_jupiter_route_data,
+    state::EscrowAccount, swap_cpi, PROTOCOL_VAULT_SEED,
 };
-use jupiter_aggregator::program::Jupiter;
+use jupiter::program::Jupiter;
 
-declare_program!(jupiter_aggregator);
-declare_program!(idl);
+declare_program!(jupiter);
 
 #[derive(Accounts)]
 pub struct FillOrder<'info> {
@@ -87,6 +89,7 @@ pub fn fill<'info>(
     );
 
     let escrow_account = &args.escrow_account;
+
     require!(
         escrow_account.maker == ctx.accounts.maker.key(),
         CustomError::InvalidEscrowMaker
@@ -98,11 +101,21 @@ pub fn fill<'info>(
     );
 
     require!(
+        escrow_account.tokens.input_token_program == ctx.accounts.input_token_program.key(),
+        ErrorCode::InvalidProgramId
+    );
+
+    require!(
         escrow_account.tokens.output_mint == ctx.accounts.output_mint.key(),
         CustomError::InvalidOutputMint
     );
 
-    // FIXME: validate the accounts
+    require!(
+        escrow_account.tokens.output_token_program == ctx.accounts.output_token_program.key(),
+        ErrorCode::InvalidProgramId
+    );
+
+    // FIXME: validate this accounts
     let remaining = &ctx.remaining_accounts;
     let light_accounts = &remaining[0..10];
     let jupiter_accounts = &remaining[10..];
@@ -132,19 +145,19 @@ pub fn fill<'info>(
         &ctx.accounts.jupiter_program,
     )?;
 
-    light_cpi_close(&ctx, args, light_accounts)?;
+    let escrow_address = light_cpi_close(&ctx, args, light_accounts)?;
+
+    transfer_tokens(&ctx, escrow_account.amount.taking_amount)?;
 
     emit!(FillOrderEvent {
+        escrow_account: escrow_address,
         maker: escrow_account.maker,
         input_mint: escrow_account.tokens.input_mint,
         output_mint: escrow_account.tokens.output_mint,
         in_amount,
         out_amount: escrow_account.amount.taking_amount,
         fee_bps: escrow_account.fee_bps,
-        escrow_account,
     });
-
-    transfer_tokens(&ctx, escrow_account.amount.taking_amount)?;
 
     Ok(())
 }
@@ -183,7 +196,7 @@ pub fn light_cpi_close<'info>(
     ctx: &Context<'_, '_, '_, 'info, FillOrder<'info>>,
     args: FillOrderParams,
     light_accounts: &[AccountInfo<'info>],
-) -> Result<()> {
+) -> Result<Pubkey> {
     let escrow_account = args.escrow_account;
 
     let escrow = LightAccount::<'_, EscrowAccount>::new_mut(
@@ -203,11 +216,34 @@ pub fn light_cpi_close<'info>(
     )
     .map_err(ProgramError::from)?;
 
+    require!(
+        *escrow.owner() == crate::ID,
+        ErrorCode::AccountOwnedByWrongProgram
+    );
+
+    let (address, _address_seed) = derive_address(
+        &[
+            b"escrow",
+            escrow_account.unique_id.to_le_bytes().as_ref(),
+            ctx.accounts.maker.key().as_ref(),
+        ],
+        &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
+            .expect("Invalid merkle tree pubkey"),
+        &crate::ID,
+    );
+
+    if address != escrow.address().expect("Invalid escrow address") {
+        return Err(error!(CustomError::InvalidEscrow));
+    }
+
     let cpi_accounts = light_sdk::cpi::CpiAccounts::new(
         ctx.accounts.payer.as_ref(),
         light_accounts,
         crate::LIGHT_CPI_SIGNER,
     );
+
+    let escrow_address =
+        Pubkey::new_from_array((*escrow.address()).expect("Address should be valid"));
 
     let cpi_inputs = light_sdk::cpi::CpiInputs::new(
         args.proof,
@@ -218,18 +254,18 @@ pub fn light_cpi_close<'info>(
         .invoke_light_system_program(cpi_accounts)
         .map_err(ProgramError::from)?;
 
-    Ok(())
+    Ok(escrow_address)
 }
 
 #[event]
 pub struct FillOrderEvent {
+    pub escrow_account: Pubkey,
     pub maker: Pubkey,
     pub input_mint: Pubkey,
     pub output_mint: Pubkey,
     pub in_amount: u64,
     pub out_amount: u64,
     pub fee_bps: u64,
-    pub escrow_account: EscrowAccount,
 }
 
 // Jupiter route types

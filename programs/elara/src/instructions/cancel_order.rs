@@ -136,6 +136,9 @@ pub fn cancel<'info>(
         crate::LIGHT_CPI_SIGNER,
     );
 
+    let escrow_addrees =
+        Pubkey::new_from_array((*escrow.address()).expect("Address should be valid"));
+
     let cpi_inputs = CpiInputs::new(
         args.proof,
         vec![escrow.to_account_info().map_err(ProgramError::from)?],
@@ -161,6 +164,7 @@ pub fn cancel<'info>(
     );
 
     emit!(OrderCancelled {
+        escrow_addrees,
         maker: ctx.accounts.maker.key(),
         unique_id: escrow_account.unique_id,
         input_mint: ctx.accounts.input_mint.key(),
@@ -179,6 +183,7 @@ pub fn cancel<'info>(
 
 #[event]
 pub struct OrderCancelled {
+    pub escrow_addrees: Pubkey,
     pub maker: Pubkey,
     pub unique_id: u64,
     pub input_mint: Pubkey,

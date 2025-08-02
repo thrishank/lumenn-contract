@@ -9,9 +9,9 @@ use light_sdk::{
     instruction::{account_meta::CompressedAccountMeta, ValidityProof},
 };
 
-use jupiter_aggregator::program::Jupiter;
-declare_program!(jupiter_aggregator);
-declare_program!(idl);
+use jupiter::program::Jupiter;
+
+declare_program!(jupiter);
 
 use crate::parse_jupiter_route_data;
 use crate::{
