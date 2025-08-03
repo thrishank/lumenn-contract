@@ -66,11 +66,20 @@ pub mod elara {
     // to send the output tokens to the maker, maker needs to have an associated token account
     // usallay created when initializing the order but if they close we create it
     // take samll amount from the making amount and swap it SOL and create the ATA
+    #[instruction(discriminator = [0])]
     pub fn create_ata<'info>(
         ctx: Context<'_, '_, '_, 'info, CreateToken<'info>>,
         args: CreateTokenAccountArgs,
     ) -> Result<()> {
         create_token_account::create_token_account(ctx, args)
+    }
+
+    #[instruction(discriminator = [1])]
+    pub fn create_ata_wsol<'info>(
+        ctx: Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
+        args: CreateTokenAccountWsolArgs,
+    ) -> Result<()> {
+        create_ata_wsol::create_token_account(ctx, args)
     }
 }
 

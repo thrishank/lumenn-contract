@@ -167,7 +167,7 @@ pub fn fill<'info>(
     Ok(())
 }
 
-pub fn transfer_tokens<'info>(
+fn transfer_tokens<'info>(
     ctx: &Context<'_, '_, '_, 'info, FillOrder<'info>>,
     amount: u64,
 ) -> Result<()> {
@@ -188,6 +188,8 @@ pub fn transfer_tokens<'info>(
 
     let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
 
+    // TODO: we have the SOL token as w-sol how to sent it to the user ?
+
     transfer_checked(
         cpi_transfer.with_signer(signer_seeds),
         amount,
@@ -197,7 +199,7 @@ pub fn transfer_tokens<'info>(
     Ok(())
 }
 
-pub fn light_cpi_close<'info>(
+fn light_cpi_close<'info>(
     ctx: &Context<'_, '_, '_, 'info, FillOrder<'info>>,
     args: FillOrderParams,
     light_accounts: &[AccountInfo<'info>],

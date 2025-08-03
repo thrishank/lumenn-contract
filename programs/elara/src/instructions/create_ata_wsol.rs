@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::{create, Create};
 use anchor_spl::{
-    associated_token::{get_associated_token_address, AssociatedToken},
+    associated_token::AssociatedToken,
     token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 use light_sdk::{
@@ -9,28 +8,30 @@ use light_sdk::{
     instruction::{account_meta::CompressedAccountMeta, ValidityProof},
 };
 
-use jupiter::program::Jupiter;
-
-declare_program!(jupiter);
-
-use crate::{
-    error::CustomError, state::EscrowAccount, swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
-};
+use crate::{error::CustomError, state::EscrowAccount, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED};
 use crate::{parse_jupiter_route_data, SOL_MINT};
 
 #[derive(Accounts)]
-pub struct CreateToken<'info> {
+pub struct CreateTokenWsol<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
     /// CHECK: This account is the owner of the new token account
-    pub maker: UncheckedAccount<'info>,
+    pub maker: AccountInfo<'info>,
 
-    pub mint: InterfaceAccount<'info, Mint>,
+    pub sol_mint: InterfaceAccount<'info, Mint>,
 
-    /// CHECK: check in program logic
-    #[account(mut)]
-    pub maker_token_ata: UncheckedAccount<'info>,
+    pub output_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        init,
+        payer = payer,
+        associated_token::mint = output_mint,
+        associated_token::authority = maker,
+        associated_token::token_program = token_program
+
+    )]
+    pub maker_token_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -41,48 +42,39 @@ pub struct CreateToken<'info> {
 
     #[account(
         mut,
-        associated_token::mint = mint,
+        associated_token::mint = sol_mint,
         associated_token::authority = protocol_vault,
         associated_token::token_program = token_program
     )]
     pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
 
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = sol_mint,
+        associated_token::authority = payer,
+        associated_token::token_program = token_program
+
+    )]
+    pub payer_wsol_mint_ata: InterfaceAccount<'info, TokenAccount>,
+
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    // pub jupiter_program: Program<'info, Jupiter>,
-    /// CHECK: This is the Jupiter program account
-    pub jupiter_program: UncheckedAccount<'info>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
-pub struct CreateTokenAccountArgs {
+pub struct CreateTokenAccountWsolArgs {
     pub swap_data: Vec<u8>,
-    pub taking_amount: u64,
     pub escrow_account: EscrowAccount,
     pub proof: ValidityProof,
     pub account_meta: CompressedAccountMeta,
 }
 
 pub fn create_token_account<'info>(
-    ctx: Context<'_, '_, '_, 'info, CreateToken<'info>>,
-    args: CreateTokenAccountArgs,
+    ctx: Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
+    args: CreateTokenAccountWsolArgs,
 ) -> Result<()> {
-    let expected_ata =
-        get_associated_token_address(&ctx.accounts.maker.key(), &ctx.accounts.mint.key());
-
-    if ctx.accounts.maker_token_ata.key() != expected_ata {
-        return Err(error!(CustomError::InvalidTokenAccount));
-    }
-
-    if !ctx.accounts.maker_token_ata.data_is_empty() {
-        return Err(error!(CustomError::TokenAccountAlreadyExists));
-    }
-
-    let remaining = &ctx.remaining_accounts;
-    let light_accounts = &remaining[0..10];
-    let jupiter_accounts = &remaining[10..];
-
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
     if jup_data.out_amount != 2039280 {
@@ -101,34 +93,21 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
-    let is_making_sol = ctx.accounts.mint.key().to_string() == SOL_MINT;
+    let is_making_sol = ctx.accounts.sol_mint.key().to_string() == SOL_MINT
+        && args.escrow_account.tokens.input_mint.key().to_string() == SOL_MINT;
 
-    /*
-    swap_cpi(
-        &args.swap_data,
-        jupiter_accounts,
-        &ctx.accounts.jupiter_program,
-        &ctx.accounts.protocol_vault.to_account_info(),
-    )?;
-    */
+    require!(is_making_sol, CustomError::InvalidInputMint);
 
-    light_cpi(
-        &ctx,
-        light_accounts,
-        &args,
-        jup_data.in_amount,
-        args.taking_amount,
-    )?;
-    create_associated_token_account(&ctx)?;
+    transfer_sol_from_vault(&ctx, 2039280)?;
+
+    light_cpi(&ctx, &args, jup_data.in_amount)?;
     Ok(())
 }
 
 fn light_cpi<'info>(
-    ctx: &Context<'_, '_, '_, 'info, CreateToken<'info>>,
-    light_accounts: &[AccountInfo<'info>],
-    args: &CreateTokenAccountArgs,
+    ctx: &Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
+    args: &CreateTokenAccountWsolArgs,
     amount_swapped: u64,
-    taking_amount: u64,
 ) -> Result<()> {
     let escrow_account = args.escrow_account;
 
@@ -152,19 +131,19 @@ fn light_cpi<'info>(
     escrow.amount.making_amount = escrow
         .amount
         .making_amount
-        .checked_sub(amount_swapped)
+        .checked_sub(2039280)
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
     // NOTE: calculate the equivalent taking amount and subtract it from the state
     escrow.amount.taking_amount = escrow
         .amount
         .taking_amount
-        .checked_sub(taking_amount)
+        .checked_sub(amount_swapped)
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
     let cpi_accounts = light_sdk::cpi::CpiAccounts::new(
         ctx.accounts.payer.as_ref(),
-        light_accounts,
+        ctx.remaining_accounts,
         LIGHT_CPI_SIGNER,
     );
 
@@ -180,24 +159,29 @@ fn light_cpi<'info>(
     Ok(())
 }
 
-pub fn create_associated_token_account<'info>(
-    ctx: &Context<'_, '_, '_, 'info, CreateToken<'info>>,
+pub fn transfer_sol_from_vault<'info>(
+    ctx: &Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
+    amount: u64,
 ) -> Result<()> {
-    let cpi_accounts = Create {
-        payer: ctx.accounts.protocol_vault.to_account_info(),
-        associated_token: ctx.accounts.maker_token_ata.to_account_info(),
-        authority: ctx.accounts.maker.to_account_info(),
-        mint: ctx.accounts.mint.to_account_info(),
-        system_program: ctx.accounts.system_program.to_account_info(),
-        token_program: ctx.accounts.token_program.to_account_info(),
+    let cpi_transfer_accounts = TransferChecked {
+        from: ctx.accounts.protocol_vault_input_mint_ata.to_account_info(),
+        to: ctx.accounts.payer_wsol_mint_ata.to_account_info(),
+        authority: ctx.accounts.protocol_vault.to_account_info(),
+        mint: ctx.accounts.sol_mint.to_account_info(),
     };
 
-    let cpi_program = ctx.accounts.associated_token_program.to_account_info();
-    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+    let cpi_transfer = CpiContext::new(
+        ctx.accounts.token_program.to_account_info(),
+        cpi_transfer_accounts,
+    );
 
     let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
 
-    create(cpi_ctx.with_signer(signer_seeds))?;
+    transfer_checked(
+        cpi_transfer.with_signer(signer_seeds),
+        amount,
+        ctx.accounts.sol_mint.decimals,
+    )?;
 
     Ok(())
 }

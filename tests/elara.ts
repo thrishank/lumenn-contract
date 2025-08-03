@@ -1,12 +1,19 @@
 import * as anchor from "@coral-xyz/anchor";
-import { createCloseAccountInstruction } from "@solana/spl-token";
+import {
+  createAssociatedTokenAccountInstruction,
+  createCloseAccountInstruction,
+  createSyncNativeInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import axios from "axios";
 import { Program } from "@coral-xyz/anchor";
 import { Elara } from "../target/types/elara";
 import {
   ComputeBudgetProgram,
+  LAMPORTS_PER_SOL,
   PublicKey,
   Signer,
+  SystemProgram,
   Transaction,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
@@ -35,6 +42,8 @@ describe("elara", () => {
     "J7LM6p22Ef8VhREZzkLToSADrXhAiiQUn3P2BAwo1RSe"
   );
 
+  const sol_mint = new PublicKey("So11111111111111111111111111111111111111112");
+
   const output_mint = new PublicKey(
     "9RzWC4ZS6LdNUP2LwaY7Ztq5sTxgt3dFLp2jjokhm9Vz"
   );
@@ -62,6 +71,7 @@ describe("elara", () => {
   const assetSeed = deriveAddressSeed(seeds, program.programId);
   const address = deriveAddress(assetSeed, ADDRESS_TREE);
 
+  /*
   it("init order", async () => {
     console.clear();
 
@@ -119,10 +129,97 @@ describe("elara", () => {
       .rpc();
     console.log("Order initialized  signature:", tx);
   });
+  */
 
-  it("create token account", async () => {
+  it("init order with WSOL", async () => {
+    // const unique_id = new anchor.BN(Date.now());
+    //
+    // const seeds: Uint8Array[] = [
+    //   Buffer.from("escrow"),
+    //   unique_id.toArrayLike(Buffer, "le", 8),
+    //   payer.publicKey.toBuffer(),
+    // ];
+    //
+    // const assetSeed = deriveAddressSeed(seeds, program.programId);
+    // const address = deriveAddress(assetSeed, ADDRESS_TREE);
+    //
+    console.clear();
+    console.log("Initializing order...");
+
+    const proof = await rpc.getValidityProofV0(undefined, [
+      {
+        address: bn(address.toBytes()),
+        tree: ADDRESS_TREE,
+        queue: ADDRESS_QUEUE,
+      },
+    ]);
+
+    const validityProof = proof.compressedProof;
+
+    const wSOL_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
+
+    const tx = await program.methods
+      .initializeOrder(
+        {
+          uniqueId: unique_id,
+          makingAmount: new BN(1_000_000_0),
+          takingAmount: new BN(1_000_000_000),
+          expiredAt: null,
+          slippageBps: 100,
+        },
+        {
+          proof: {
+            0: {
+              a: validityProof.a,
+              b: validityProof.b,
+              c: validityProof.c,
+            },
+          },
+          addressTreeInfo: {
+            addressMerkleTreePubkeyIndex: 0,
+            addressQueuePubkeyIndex: 2,
+            rootIndex: proof.rootIndices[0],
+          },
+          outputStateTreeIndex: 1,
+        }
+      )
+      .accounts({
+        payer: payer.publicKey,
+        inputMint: sol_mint,
+        outputMint: output_mint,
+        inputTokenProgram: TOKEN_PROGRAM_ID,
+        outputTokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .remainingAccounts(INIT_REMAINING_ACCOUNTS)
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+        createAssociatedTokenAccountInstruction(
+          payer.publicKey,
+          wSOL_ata,
+          payer.publicKey,
+          sol_mint
+        ),
+        SystemProgram.transfer({
+          fromPubkey: payer.publicKey,
+          toPubkey: wSOL_ata,
+          lamports: 0.01 * LAMPORTS_PER_SOL,
+        }),
+        createSyncNativeInstruction(wSOL_ata),
+      ])
+      .postInstructions([
+        createCloseAccountInstruction(
+          wSOL_ata,
+          payer.publicKey,
+          payer.publicKey
+        ),
+      ])
+      .rpc();
+    console.log("Order initialized  signature:", tx);
+  });
+
+  it("create token account with input_mint as WSOL", async () => {
     console.log("closing account for testing...");
-    const ata = new PublicKey("EyV9cjPNjgp5f3QioFkqDrA8SfjhMau8qNNGzUtKvMYT");
+    const ata = new PublicKey("EyV9cjPNjgp5f3QioFkqDrA8SfjhMau8qNNGzUtKvMYT"); // out_put mint
     const ixs = createCloseAccountInstruction(
       ata,
       payer.publicKey,
@@ -152,11 +249,124 @@ describe("elara", () => {
     const buffer = compressed_account?.data?.data!;
     let escrow_data = parseEscrowFromBuffer(buffer);
 
-    const swap = await get_swap("372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j");
+    const swap = await get_swap(
+      "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
+      "So11111111111111111111111111111111111111112",
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+    );
+
+    console.log(Buffer.from(swap.swapInstruction.data, "base64").length);
+
+    const tx = await program.methods
+      .createAtaWsol({
+        swapData: Buffer.from(swap.swapInstruction.data, "base64"),
+        escrowAccount: {
+          maker: escrow_data.maker,
+          uniqueId: escrow_data.uniqueId,
+          tokens: {
+            inputMint: escrow_data.tokens.inputMint,
+            outputMint: escrow_data.tokens.outputMint,
+            inputTokenProgram: escrow_data.tokens.inputTokenProgram,
+            outputTokenProgram: escrow_data.tokens.outputTokenProgram,
+          },
+          amount: {
+            makingAmount: escrow_data.amount.makingAmount,
+            takingAmount: escrow_data.amount.takingAmount,
+            oriMakingAmount: escrow_data.amount.oriMakingAmount,
+            oriTakingAmount: escrow_data.amount.oriTakingAmount,
+          },
+          expiredAt: escrow_data.expiredAt,
+          slippageBps: escrow_data.slippageBps,
+          feeBps: escrow_data.feeBps,
+          createdAt: escrow_data.createdAt,
+          updatedAt: escrow_data.updatedAt,
+        },
+        proof: {
+          0: {
+            a: validityProof.a,
+            b: validityProof.b,
+            c: validityProof.c,
+          },
+        },
+        accountMeta: {
+          address: compressed_account.address,
+          treeInfo: {
+            rootIndex: proof.rootIndices[0],
+            merkleTreePubkeyIndex: 0,
+            queuePubkeyIndex: 1,
+            proveByIndex: false,
+            leafIndex: compressed_account.leafIndex,
+          },
+          outputStateTreeIndex: 0,
+        },
+      })
+      .accounts({
+        payer: payer.publicKey,
+        maker: payer.publicKey,
+        solMint: sol_mint,
+        outputMint: output_mint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .remainingAccounts(CLOSE_ACCOUNTS)
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+      ])
+      .rpc();
+    console.log("signature:", tx);
+  });
+
+  /*
+  it("create token account", async () => {
+    console.log("closing account for testing...");
+    const ata = new PublicKey("EyV9cjPNjgp5f3QioFkqDrA8SfjhMau8qNNGzUtKvMYT"); // out_put mint
+    const ixs = createCloseAccountInstruction(
+      ata,
+      payer.publicKey,
+      payer.publicKey,
+      [],
+      TOKEN_PROGRAM_ID
+    );
+
+    const transaction = new Transaction().add(ixs);
+    const signature = await rpc.sendTransaction(transaction, [payer]);
+    console.log("closed account for testing:", signature);
+
+    console.log("Creating token account...");
+    let compressed_account = await rpc.getCompressedAccount(
+      bn(address.toBytes())
+    );
+
+    let hash = compressed_account.hash;
+
+    let proof = await rpc.getValidityProofV0(
+      [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
+      []
+    );
+
+    const validityProof = proof.compressedProof;
+
+    const buffer = compressed_account?.data?.data!;
+    let escrow_data = parseEscrowFromBuffer(buffer);
+
+    // a order to swap sol to USDC
+
+    const swap = await get_swap(
+      "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
+      "9tqjeRS1swj36Ee5C1iGiwAxjQJNGAVCzaTLwFY8bonk",
+      "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk"
+    );
+
+    // if the making is SOL then create ATA directly no need swap
+    // and get the quote for taking_token to sol ExcaOut swap and subtact the in_amout
+    //
+    // const sol_ata = new PublicKey(
+    //   "23qfcQaTtZXrHEeHamQoYnnYYHu8yqynz549AnLNEobJ"
+    // );
 
     const tx = await program.methods
       .createAta({
         swapData: Buffer.from(swap.swapInstruction.data, "base64"),
+        takingAmount: new BN(100000),
         escrowAccount: {
           maker: escrow_data.maker,
           uniqueId: escrow_data.uniqueId,
@@ -217,6 +427,7 @@ describe("elara", () => {
     console.log("signature:", tx);
   });
 
+  /*
   it("Cancel order", async () => {
     console.log("Cancelling order...");
 
@@ -329,11 +540,14 @@ describe("elara", () => {
   */
 });
 
-async function get_swap(address: string) {
-  const quote_url =
-    "https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB&amount=2039280&swapMode=ExactOut";
+async function get_swap(
+  address: string,
+  input_mint: string,
+  output_mint: string
+) {
+  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=${input_mint}&outputMint=${output_mint}&amount=2039280&swapMode=ExactOut`;
   const quote = await axios.get(quote_url);
-  console.log("quote in amount", quote.data.inAmount);
+  // console.log("quote in amount", quote.data.inAmount);
   console.log("quote out amount", quote.data.outAmount);
   let config = {
     method: "post",
