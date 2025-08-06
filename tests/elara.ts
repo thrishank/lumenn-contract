@@ -9,12 +9,15 @@ import axios from "axios";
 import { Program } from "@coral-xyz/anchor";
 import { Elara } from "../target/types/elara";
 import {
+  AddressLookupTableAccount,
   ComputeBudgetProgram,
   LAMPORTS_PER_SOL,
   PublicKey,
   Signer,
   SystemProgram,
   Transaction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
 import { TOKEN_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
@@ -30,7 +33,12 @@ import {
   CLOSE_ACCOUNTS,
   INIT_REMAINING_ACCOUNTS,
 } from "./address";
-import { parseEscrowFromBuffer } from "./fn";
+import {
+  calculateTransactionSize,
+  clone_alt,
+  create_alt,
+  parseEscrowFromBuffer,
+} from "./fn";
 
 describe("elara", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -56,7 +64,7 @@ describe("elara", () => {
   const rpc = createRpc(url, indexer, url);
 
   const unique_id = new anchor.BN(Date.now());
-  // const unique_id = new anchor.BN(32343343);
+  const unique_id1 = new anchor.BN(Date.now());
   const protocol_vault = PublicKey.findProgramAddressSync(
     [Buffer.from("protocol_vault")],
     program.programId
@@ -70,6 +78,8 @@ describe("elara", () => {
 
   const assetSeed = deriveAddressSeed(seeds, program.programId);
   const address = deriveAddress(assetSeed, ADDRESS_TREE);
+
+  console.clear();
 
   /*
   it("init order", async () => {
@@ -117,6 +127,7 @@ describe("elara", () => {
       )
       .accounts({
         payer: payer.publicKey,
+        maker: payer.publicKey,
         inputMint: input_mint,
         outputMint: output_mint,
         inputTokenProgram: TOKEN_PROGRAM_ID,
@@ -129,8 +140,8 @@ describe("elara", () => {
       .rpc();
     console.log("Order initialized  signature:", tx);
   });
-  */
 
+  /*
   it("init order with WSOL", async () => {
     // const unique_id = new anchor.BN(Date.now());
     //
@@ -162,7 +173,7 @@ describe("elara", () => {
       .initializeOrder(
         {
           uniqueId: unique_id,
-          makingAmount: new BN(1_000_000_0),
+          makingAmount: new BN(203_92800),
           takingAmount: new BN(1_000_000_000),
           expiredAt: null,
           slippageBps: 100,
@@ -185,6 +196,7 @@ describe("elara", () => {
       )
       .accounts({
         payer: payer.publicKey,
+        maker: payer.publicKey,
         inputMint: sol_mint,
         outputMint: output_mint,
         inputTokenProgram: TOKEN_PROGRAM_ID,
@@ -202,7 +214,7 @@ describe("elara", () => {
         SystemProgram.transfer({
           fromPubkey: payer.publicKey,
           toPubkey: wSOL_ata,
-          lamports: 0.01 * LAMPORTS_PER_SOL,
+          lamports: 203_92800,
         }),
         createSyncNativeInstruction(wSOL_ata),
       ])
@@ -313,7 +325,9 @@ describe("elara", () => {
       ])
       .rpc();
     console.log("signature:", tx);
+    console.log("unique id:", unique_id.toString());
   });
+  */
 
   /*
   it("create token account", async () => {
@@ -328,12 +342,14 @@ describe("elara", () => {
     );
 
     const transaction = new Transaction().add(ixs);
-    const signature = await rpc.sendTransaction(transaction, [payer]);
-    console.log("closed account for testing:", signature);
+    // const signature = await rpc.sendTransaction(transaction, [payer]);
+    // console.log("closed account for testing:", signature);
 
     console.log("Creating token account...");
     let compressed_account = await rpc.getCompressedAccount(
-      bn(address.toBytes())
+      bn(
+        new PublicKey("12PdjJAeKnWPRMtuwnuayLkQAADV2pRP5oxKkmx8vqqn").toBytes()
+      )
     );
 
     let hash = compressed_account.hash;
@@ -352,8 +368,8 @@ describe("elara", () => {
 
     const swap = await get_swap(
       "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
-      "9tqjeRS1swj36Ee5C1iGiwAxjQJNGAVCzaTLwFY8bonk",
-      "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk"
+      "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr",
+      "So11111111111111111111111111111111111111112"
     );
 
     // if the making is SOL then create ATA directly no need swap
@@ -363,7 +379,9 @@ describe("elara", () => {
     //   "23qfcQaTtZXrHEeHamQoYnnYYHu8yqynz549AnLNEobJ"
     // );
 
-    const tx = await program.methods
+    const { accounts: jup_accounts, alt } = await get_accounts();
+
+    const instruction = await program.methods
       .createAta({
         swapData: Buffer.from(swap.swapInstruction.data, "base64"),
         takingAmount: new BN(100000),
@@ -419,12 +437,58 @@ describe("elara", () => {
           "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
         ),
       })
-      .remainingAccounts(CLOSE_ACCOUNTS)
-      .preInstructions([
+      .remainingAccounts([...CLOSE_ACCOUNTS, ...jup_accounts])
+      .instruction();
+
+    console.log(alt);
+
+    // TODO: create a alt for the close accounts
+
+    // 7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5
+    // const alt_close = await create_alt(CLOSE_ACCOUNTS.map((acc) => acc.pubkey));
+
+    const altAddresse = await Promise.all(
+      alt.map(async (key: string) => {
+        const newAlt = await clone_alt(key);
+        return newAlt;
+      })
+    );
+
+    const altAddresses = [
+      "7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5",
+      ...altAddresse,
+    ];
+    console.log("altAddresses", altAddresses);
+
+    const altLookups = await Promise.all(
+      altAddresses.map(async (address: any) => {
+        const alt = await rpc.getAddressLookupTable(new PublicKey(address));
+        if (!alt.value) throw new Error(`ALT not found: ${address}`);
+        return new AddressLookupTableAccount({
+          key: new PublicKey(address),
+          state: alt.value.state,
+        });
+      })
+    );
+
+    const latestBlockhash = await rpc.getLatestBlockhash();
+    const message = new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: latestBlockhash.blockhash,
+      instructions: [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-      ])
-      .rpc();
-    console.log("signature:", tx);
+        instruction,
+      ],
+    }).compileToV0Message(altLookups);
+    const tx = new VersionedTransaction(message);
+    tx.sign([payer]);
+
+    const size = calculateTransactionSize(tx);
+    console.log("Transaction size:", size);
+
+    const sig = await rpc.sendTransaction(tx);
+
+    console.log("✅ Signature:", sig);
   });
 
   /*
@@ -564,4 +628,30 @@ async function get_swap(
   };
   const swap = await axios.request(config);
   return swap.data;
+}
+
+async function get_accounts() {
+  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=So11111111111111111111111111111111111111112&amount=2039280&swapMode=ExactOut`;
+
+  const quote = await axios.get(quote_url);
+  let config = {
+    method: "post",
+    maxBodyLength: Infinity,
+    url: "https://lite-api.jup.ag/swap/v1/swap-instructions",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    data: JSON.stringify({
+      userPublicKey: "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
+      quoteResponse: quote.data,
+    }),
+  };
+  const swap = await axios.request(config);
+  const accounts = swap.data.swapInstruction.accounts.map((acc: any) => ({
+    pubkey: new PublicKey(acc.pubkey),
+    isWritable: acc.isWritable,
+    isSigner: false,
+  }));
+  return { accounts, alt: swap.data.addressLookupTableAddresses };
 }

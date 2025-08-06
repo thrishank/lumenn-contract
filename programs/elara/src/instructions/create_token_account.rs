@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::{create, Create};
 use anchor_spl::{
     associated_token::{get_associated_token_address, AssociatedToken},
-    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 use light_sdk::{
     account::LightAccount,
@@ -16,6 +16,7 @@ declare_program!(jupiter);
 use crate::{
     error::CustomError, state::EscrowAccount, swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
+
 use crate::{parse_jupiter_route_data, SOL_MINT};
 
 #[derive(Accounts)]
@@ -102,6 +103,9 @@ pub fn create_token_account<'info>(
     }
 
     let is_making_sol = ctx.accounts.mint.key().to_string() == SOL_MINT;
+    if is_making_sol {
+        return Err(error!(CustomError::InvalidCreateAtaInstruction));
+    }
 
     /*
     swap_cpi(
@@ -130,6 +134,7 @@ fn light_cpi<'info>(
     amount_swapped: u64,
     taking_amount: u64,
 ) -> Result<()> {
+    msg!("account len: {}", ctx.remaining_accounts.len());
     let escrow_account = args.escrow_account;
 
     let mut escrow = LightAccount::<'_, EscrowAccount>::new_mut(

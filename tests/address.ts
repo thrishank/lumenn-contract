@@ -33,6 +33,14 @@ export const LIGHT_SYSTEM_PROGRAM = pubkey(
   "SySTEM1eSU2p4BGQfQpimFEWWSC1XDFeun3Nqzz3rT7"
 );
 
+export const COMPUTE_BUDGET_PROGRAM = pubkey(
+  "ComputeBudget111111111111111111111111111111"
+);
+
+export const ASSOCIATED_TOKEN_PROGRAM = pubkey(
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+);
+
 // Derived PDAs
 export const [CPI_AUTHORITY] = PublicKey.findProgramAddressSync(
   [Buffer.from("cpi_authority")],
@@ -80,4 +88,7 @@ export const CLOSE_ACCOUNTS = [
   { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
   { pubkey: STATE_TREE, isSigner: false, isWritable: true },
   { pubkey: STATE_QUEUE, isSigner: false, isWritable: true },
+  // ---
+  // { pubkey: COMPUTE_BUDGET_PROGRAM, isSigner: false, isWritable: false },
+  // { pubkey: ASSOCIATED_TOKEN_PROGRAM, isSigner: false, isWritable: false },
 ];

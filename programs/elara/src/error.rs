@@ -48,4 +48,6 @@ pub enum CustomError {
     InvalidEscrow,
     #[msg("Invalid platform fee bps should be either 5 or 0")]
     InvalidPlatformFeeBps,
+    #[msg("Invalid instruction to create ata when the making token is SOL call create_ata_wsol instruction")]
+    InvalidCreateAtaInstruction,
 }

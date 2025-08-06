@@ -28,8 +28,7 @@ pub struct FillOrder<'info> {
     #[account(mut)]
     pub maker: UncheckedAccount<'info>,
 
-    pub input_mint: InterfaceAccount<'info, Mint>,
-
+    // pub input_mint: InterfaceAccount<'info, Mint>,
     pub output_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
@@ -46,14 +45,13 @@ pub struct FillOrder<'info> {
     )]
     pub protocol_vault: SystemAccount<'info>,
 
-    #[account(
-        mut,
-        associated_token::mint = input_mint,
-        associated_token::authority = protocol_vault,
-        associated_token::token_program = input_token_program
-    )]
-    pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
-
+    // #[account(
+    //     mut,
+    //     associated_token::mint = input_mint,
+    //     associated_token::authority = protocol_vault,
+    //     associated_token::token_program = input_token_program
+    // )]
+    // pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
     #[account(
         init_if_needed,
         payer = payer,
@@ -95,10 +93,10 @@ pub fn fill<'info>(
         CustomError::InvalidEscrowMaker
     );
 
-    require!(
-        escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
-        CustomError::InvalidInputMint
-    );
+    // require!(
+    //     escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
+    //     CustomError::InvalidInputMint
+    // );
 
     require!(
         escrow_account.tokens.input_token_program == ctx.accounts.input_token_program.key(),
@@ -178,7 +176,7 @@ fn transfer_tokens<'info>(
             .to_account_info(),
         to: ctx.accounts.maker_output_mint_ata.to_account_info(),
         authority: ctx.accounts.protocol_vault.to_account_info(),
-        mint: ctx.accounts.input_mint.to_account_info(),
+        mint: ctx.accounts.output_mint.to_account_info(),
     };
 
     let cpi_transfer = CpiContext::new(

@@ -1,4 +1,15 @@
-import { PublicKey } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  VersionedTransaction,
+  AddressLookupTableProgram,
+  sendAndConfirmTransaction,
+  Transaction,
+  AddressLookupTableAccount,
+} from "@solana/web3.js";
+import { getKeypairFromFile } from "@solana-developers/helpers";
+
 import BN from "bn.js";
 import { Buffer } from "buffer";
 
@@ -68,4 +79,112 @@ export function parseEscrowFromBuffer(buffer: Buffer): Escrow {
     createdAt: new BN(created_at.toString()),
     updatedAt: new BN(updated_at.toString()),
   };
+}
+
+/**
+ * Utility to estimate the size of a versioned transaction
+ */
+export function calculateTransactionSize(tx: VersionedTransaction): number {
+  // Signatures (64 bytes per signature)
+  const signatureLength = tx.signatures.length * 64;
+
+  // Message serialization
+  const serializedMessage = tx.message.serialize();
+  const messageLength = serializedMessage.length;
+
+  // Total = sigs + msg
+  return signatureLength + messageLength;
+}
+
+const MAINNET = new Connection(
+  "https://mainnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d"
+);
+const DEVNET = new Connection(
+  "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d",
+  "confirmed"
+);
+
+export async function clone_alt(address: string): Promise<String> {
+  const devnetKeypair: Keypair = await getKeypairFromFile();
+  const { value: mainnetAlt } = await MAINNET.getAddressLookupTable(
+    new PublicKey(address)
+  );
+
+  if (!mainnetAlt) {
+    throw new Error("ALT not found on mainnet");
+  }
+
+  const addresses = mainnetAlt.state.addresses;
+  console.log(`Fetched ${addresses.length} addresses from ALT.`);
+
+  const recentSlot = await DEVNET.getSlot();
+
+  // Create new ALT on devnet
+  const [createIx, newAltKey] = AddressLookupTableProgram.createLookupTable({
+    authority: devnetKeypair.publicKey,
+    payer: devnetKeypair.publicKey,
+    recentSlot,
+  });
+
+  const tx1 = new Transaction().add(createIx);
+  await sendAndConfirmTransaction(DEVNET, tx1, [devnetKeypair]);
+  console.log("Created new ALT on devnet:", newAltKey.toBase58());
+
+  // Now extend it in chunks of 20 (max allowed)
+  const CHUNK_SIZE = 20;
+  for (let i = 0; i < addresses.length; i += CHUNK_SIZE) {
+    const chunk = addresses.slice(i, i + CHUNK_SIZE);
+
+    const extendIx = AddressLookupTableProgram.extendLookupTable({
+      payer: devnetKeypair.publicKey,
+      authority: devnetKeypair.publicKey,
+      lookupTable: newAltKey,
+      addresses: chunk,
+    });
+
+    const tx = new Transaction().add(extendIx);
+    await sendAndConfirmTransaction(DEVNET, tx, [devnetKeypair]);
+
+    console.log(`Extended ALT with addresses ${i}–${i + chunk.length - 1}`);
+  }
+
+  console.log("✅ ALT cloned to devnet:", newAltKey.toBase58());
+  return newAltKey.toString();
+}
+
+export async function create_alt(address: PublicKey[]): Promise<String> {
+  const devnetKeypair: Keypair = await getKeypairFromFile();
+
+  const recentSlot = await DEVNET.getSlot();
+
+  const [createIx, newAltKey] = AddressLookupTableProgram.createLookupTable({
+    authority: devnetKeypair.publicKey,
+    payer: devnetKeypair.publicKey,
+    recentSlot,
+  });
+
+  const tx1 = new Transaction().add(createIx);
+  await sendAndConfirmTransaction(DEVNET, tx1, [devnetKeypair]);
+  console.log("Created new ALT on devnet:", newAltKey.toBase58());
+
+  // Now extend it in chunks of 20 (max allowed)
+  const CHUNK_SIZE = 20;
+  for (let i = 0; i < address.length; i += CHUNK_SIZE) {
+    const chunk = address.slice(i, i + CHUNK_SIZE);
+
+    const extendIx = AddressLookupTableProgram.extendLookupTable({
+      payer: devnetKeypair.publicKey,
+      authority: devnetKeypair.publicKey,
+      lookupTable: newAltKey,
+      addresses: chunk,
+    });
+
+    const tx = new Transaction().add(extendIx);
+    await sendAndConfirmTransaction(DEVNET, tx, [devnetKeypair]);
+
+    console.log(`Extended ALT with addresses ${i}–${i + chunk.length - 1}`);
+  }
+
+  console.log("✅ ALT cloned to devnet:", newAltKey.toBase58());
+  return newAltKey.toString();
 }
