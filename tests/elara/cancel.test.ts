@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import {
-  createAssociatedTokenAccountInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
   createCloseAccountInstruction,
   createSyncNativeInstruction,
   getAccount,
@@ -27,13 +27,13 @@ import {
   ADDRESS_TREE,
   CLOSE_ACCOUNTS,
   INIT_REMAINING_ACCOUNTS,
-} from ".././address";
-import { parseEscrowFromBuffer } from ".././fn";
+} from "../utils/address";
+import { parseEscrowFromBuffer } from "../utils/fn";
 
 import { assert } from "chai";
-import { assertEscrowDoesNotExist, assertEscrowState } from "../utils/check";
+import { assertEscrowDoesNotExist } from "../utils/check";
 
-describe("elara/init_order", () => {
+describe("elara/cancel_order", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
 
   const program = anchor.workspace.elara as Program<Elara>;
@@ -323,7 +323,7 @@ describe("elara/init_order", () => {
       .remainingAccounts(INIT_REMAINING_ACCOUNTS)
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-        createAssociatedTokenAccountInstruction(
+        createAssociatedTokenAccountIdempotentInstruction(
           payer.publicKey,
           wSOL_ata,
           payer.publicKey,

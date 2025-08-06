@@ -32,13 +32,13 @@ import {
   ADDRESS_TREE,
   CLOSE_ACCOUNTS,
   INIT_REMAINING_ACCOUNTS,
-} from "./address";
+} from "./utils/address";
 import {
   calculateTransactionSize,
   clone_alt,
   create_alt,
   parseEscrowFromBuffer,
-} from "./fn";
+} from "./utils/fn";
 
 describe("elara", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -82,154 +82,7 @@ describe("elara", () => {
   console.clear();
 
   /*
-  it("init order", async () => {
-    console.clear();
-
-    console.log("protocol_vault", protocol_vault.toString());
-    console.log("escrow address", address.toString());
-
-    console.log("Initializing order...");
-
-    const proof = await rpc.getValidityProofV0(undefined, [
-      {
-        address: bn(address.toBytes()),
-        tree: ADDRESS_TREE,
-        queue: ADDRESS_QUEUE,
-      },
-    ]);
-
-    const validityProof = proof.compressedProof;
-
-    const tx = await program.methods
-      .initializeOrder(
-        {
-          uniqueId: unique_id,
-          makingAmount: new BN(1_000_000_000),
-          takingAmount: new BN(1_000_000_000),
-          expiredAt: null,
-          slippageBps: 100,
-        },
-        {
-          proof: {
-            0: {
-              a: validityProof.a,
-              b: validityProof.b,
-              c: validityProof.c,
-            },
-          },
-          addressTreeInfo: {
-            addressMerkleTreePubkeyIndex: 0,
-            addressQueuePubkeyIndex: 2,
-            rootIndex: proof.rootIndices[0],
-          },
-          outputStateTreeIndex: 1,
-        }
-      )
-      .accounts({
-        payer: payer.publicKey,
-        maker: payer.publicKey,
-        inputMint: input_mint,
-        outputMint: output_mint,
-        inputTokenProgram: TOKEN_PROGRAM_ID,
-        outputTokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .remainingAccounts(INIT_REMAINING_ACCOUNTS)
-      .preInstructions([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-      ])
-      .rpc();
-    console.log("Order initialized  signature:", tx);
-  });
-
-  /*
-  it("init order with WSOL", async () => {
-    // const unique_id = new anchor.BN(Date.now());
-    //
-    // const seeds: Uint8Array[] = [
-    //   Buffer.from("escrow"),
-    //   unique_id.toArrayLike(Buffer, "le", 8),
-    //   payer.publicKey.toBuffer(),
-    // ];
-    //
-    // const assetSeed = deriveAddressSeed(seeds, program.programId);
-    // const address = deriveAddress(assetSeed, ADDRESS_TREE);
-    //
-    console.clear();
-    console.log("Initializing order...");
-
-    const proof = await rpc.getValidityProofV0(undefined, [
-      {
-        address: bn(address.toBytes()),
-        tree: ADDRESS_TREE,
-        queue: ADDRESS_QUEUE,
-      },
-    ]);
-
-    const validityProof = proof.compressedProof;
-
-    const wSOL_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
-
-    const tx = await program.methods
-      .initializeOrder(
-        {
-          uniqueId: unique_id,
-          makingAmount: new BN(203_92800),
-          takingAmount: new BN(1_000_000_000),
-          expiredAt: null,
-          slippageBps: 100,
-        },
-        {
-          proof: {
-            0: {
-              a: validityProof.a,
-              b: validityProof.b,
-              c: validityProof.c,
-            },
-          },
-          addressTreeInfo: {
-            addressMerkleTreePubkeyIndex: 0,
-            addressQueuePubkeyIndex: 2,
-            rootIndex: proof.rootIndices[0],
-          },
-          outputStateTreeIndex: 1,
-        }
-      )
-      .accounts({
-        payer: payer.publicKey,
-        maker: payer.publicKey,
-        inputMint: sol_mint,
-        outputMint: output_mint,
-        inputTokenProgram: TOKEN_PROGRAM_ID,
-        outputTokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .remainingAccounts(INIT_REMAINING_ACCOUNTS)
-      .preInstructions([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-        createAssociatedTokenAccountInstruction(
-          payer.publicKey,
-          wSOL_ata,
-          payer.publicKey,
-          sol_mint
-        ),
-        SystemProgram.transfer({
-          fromPubkey: payer.publicKey,
-          toPubkey: wSOL_ata,
-          lamports: 203_92800,
-        }),
-        createSyncNativeInstruction(wSOL_ata),
-      ])
-      .postInstructions([
-        createCloseAccountInstruction(
-          wSOL_ata,
-          payer.publicKey,
-          payer.publicKey
-        ),
-      ])
-      .rpc();
-    console.log("Order initialized  signature:", tx);
-  });
-
-  it("create token account with input_mint as WSOL", async () => {
+ it("create token account with input_mint as WSOL", async () => {
     console.log("closing account for testing...");
     const ata = new PublicKey("EyV9cjPNjgp5f3QioFkqDrA8SfjhMau8qNNGzUtKvMYT"); // out_put mint
     const ixs = createCloseAccountInstruction(
@@ -492,82 +345,6 @@ describe("elara", () => {
   });
 
   /*
-  it("Cancel order", async () => {
-    console.log("Cancelling order...");
-
-    let compressed_account = await rpc.getCompressedAccount(
-      bn(address.toBytes())
-    );
-
-    let hash = compressed_account.hash;
-
-    let proof = await rpc.getValidityProofV0(
-      [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
-      []
-    );
-
-    const validityProof = proof.compressedProof;
-
-    const buffer = compressed_account?.data?.data!;
-    let escrow_data = parseEscrowFromBuffer(buffer);
-
-    const tx = await program.methods
-      .cancelOrder({
-        escrowAccount: {
-          maker: escrow_data.maker,
-          uniqueId: escrow_data.uniqueId,
-          tokens: {
-            inputMint: escrow_data.tokens.inputMint,
-            outputMint: escrow_data.tokens.outputMint,
-            inputTokenProgram: escrow_data.tokens.inputTokenProgram,
-            outputTokenProgram: escrow_data.tokens.outputTokenProgram,
-          },
-          amount: {
-            makingAmount: escrow_data.amount.makingAmount,
-            takingAmount: escrow_data.amount.takingAmount,
-            oriMakingAmount: escrow_data.amount.oriMakingAmount,
-            oriTakingAmount: escrow_data.amount.oriTakingAmount,
-          },
-          expiredAt: escrow_data.expiredAt,
-          slippageBps: escrow_data.slippageBps,
-          feeBps: escrow_data.feeBps,
-          createdAt: escrow_data.createdAt,
-          updatedAt: escrow_data.updatedAt,
-        },
-        proof: {
-          0: {
-            a: validityProof.a,
-            b: validityProof.b,
-            c: validityProof.c,
-          },
-        },
-        accountMeta: {
-          address: compressed_account.address,
-          treeInfo: {
-            rootIndex: proof.rootIndices[0],
-            merkleTreePubkeyIndex: 0,
-            queuePubkeyIndex: 1,
-            proveByIndex: false,
-            leafIndex: compressed_account.leafIndex,
-          },
-          outputStateTreeIndex: 0,
-        },
-      })
-      .accounts({
-        payer: payer.publicKey,
-        maker: payer.publicKey,
-        inputMint: input_mint,
-        inputTokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .remainingAccounts(CLOSE_ACCOUNTS)
-      .preInstructions([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-      ])
-      .rpc();
-    console.log("Order cancelled with transaction signature:", tx);
-  });
-
-  /*
   it("Fill order", async () => {
     console.clear();
     console.log("fetching swap...");
@@ -603,55 +380,3 @@ describe("elara", () => {
   });
   */
 });
-
-async function get_swap(
-  address: string,
-  input_mint: string,
-  output_mint: string
-) {
-  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=${input_mint}&outputMint=${output_mint}&amount=2039280&swapMode=ExactOut`;
-  const quote = await axios.get(quote_url);
-  // console.log("quote in amount", quote.data.inAmount);
-  console.log("quote out amount", quote.data.outAmount);
-  let config = {
-    method: "post",
-    maxBodyLength: Infinity,
-    url: "https://lite-api.jup.ag/swap/v1/swap-instructions",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    data: JSON.stringify({
-      userPublicKey: address,
-      quoteResponse: quote.data,
-    }),
-  };
-  const swap = await axios.request(config);
-  return swap.data;
-}
-
-async function get_accounts() {
-  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=So11111111111111111111111111111111111111112&amount=2039280&swapMode=ExactOut`;
-
-  const quote = await axios.get(quote_url);
-  let config = {
-    method: "post",
-    maxBodyLength: Infinity,
-    url: "https://lite-api.jup.ag/swap/v1/swap-instructions",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    data: JSON.stringify({
-      userPublicKey: "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
-      quoteResponse: quote.data,
-    }),
-  };
-  const swap = await axios.request(config);
-  const accounts = swap.data.swapInstruction.accounts.map((acc: any) => ({
-    pubkey: new PublicKey(acc.pubkey),
-    isWritable: acc.isWritable,
-    isSigner: false,
-  }));
-  return { accounts, alt: swap.data.addressLookupTableAddresses };
-}

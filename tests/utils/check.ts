@@ -1,8 +1,8 @@
 import { assert } from "chai";
 import { PublicKey } from "@solana/web3.js";
 import { bn } from "@lightprotocol/stateless.js";
-import { parseEscrowFromBuffer } from "../fn";
-import { PROGRAM_ID } from "../address";
+import { parseEscrowFromBuffer } from "./fn";
+import { PROGRAM_ID } from "./address";
 import BN from "bn.js";
 
 /**
