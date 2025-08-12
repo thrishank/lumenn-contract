@@ -68,7 +68,7 @@ pub struct CreateTokenAccountArgs {
     pub account_meta: CompressedAccountMeta,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Copy)]
 pub struct AccountParams {
     pub unique_id: u64,
     pub amount: Amount,

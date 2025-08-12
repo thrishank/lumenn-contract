@@ -12,8 +12,12 @@ use light_sdk::{
 };
 
 use crate::{
-    error::CustomError, jupiter::types::RoutePlanStep, parse_jupiter_route_data,
-    state::EscrowAccount, swap_cpi, PROTOCOL_VAULT_SEED,
+    error::CustomError,
+    instructions::AccountParams,
+    jupiter::types::RoutePlanStep,
+    parse_jupiter_route_data,
+    state::{EscrowAccount, Tokens},
+    swap_cpi, PROTOCOL_VAULT_SEED,
 };
 
 use jupiter::program::Jupiter;
@@ -28,6 +32,8 @@ pub struct FillOrder<'info> {
     /// CHECK: check maker.key == order.maker
     #[account(mut)]
     pub maker: UncheckedAccount<'info>,
+
+    pub input_mint: InterfaceAccount<'info, Mint>,
 
     // pub input_mint: InterfaceAccount<'info, Mint>,
     pub output_mint: InterfaceAccount<'info, Mint>,
@@ -73,7 +79,7 @@ pub struct FillOrder<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct FillOrderParams {
     pub swap_data: Vec<u8>,
-    pub escrow_account: EscrowAccount,
+    pub escrow_account: AccountParams,
     pub proof: ValidityProof,
     pub account_meta: CompressedAccountMeta,
 }
@@ -87,32 +93,32 @@ pub fn fill<'info>(
         CustomError::InvalidJupInstructionData
     );
 
-    let escrow_account = &args.escrow_account;
+    // let escrow_account = &args.escrow_account;
 
-    require!(
-        escrow_account.maker == ctx.accounts.maker.key(),
-        CustomError::InvalidEscrowMaker
-    );
+    // require!(
+    //     escrow_account.maker == ctx.accounts.maker.key(),
+    //     CustomError::InvalidEscrowMaker
+    // );
 
     // require!(
     //     escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
     //     CustomError::InvalidInputMint
     // );
 
-    require!(
-        escrow_account.tokens.input_token_program == ctx.accounts.input_token_program.key(),
-        ErrorCode::InvalidProgramId
-    );
-
-    require!(
-        escrow_account.tokens.output_mint == ctx.accounts.output_mint.key(),
-        CustomError::InvalidOutputMint
-    );
-
-    require!(
-        escrow_account.tokens.output_token_program == ctx.accounts.output_token_program.key(),
-        ErrorCode::InvalidProgramId
-    );
+    // require!(
+    //     escrow_account.tokens.input_token_program == ctx.accounts.input_token_program.key(),
+    //     ErrorCode::InvalidProgramId
+    // );
+    //
+    // require!(
+    //     escrow_account.tokens.output_mint == ctx.accounts.output_mint.key(),
+    //     CustomError::InvalidOutputMint
+    // );
+    //
+    // require!(
+    //     escrow_account.tokens.output_token_program == ctx.accounts.output_token_program.key(),
+    //     ErrorCode::InvalidProgramId
+    // );
 
     // FIXME: validate this accounts
     let remaining = &ctx.remaining_accounts;
@@ -155,9 +161,9 @@ pub fn fill<'info>(
 
     emit!(FillOrderEvent {
         escrow_account: escrow_address,
-        maker: escrow_account.maker,
-        input_mint: escrow_account.tokens.input_mint,
-        output_mint: escrow_account.tokens.output_mint,
+        maker: ctx.accounts.maker.key(),
+        input_mint: ctx.accounts.input_mint.key(),
+        output_mint: ctx.accounts.output_mint.key(),
         in_amount,
         out_amount: escrow_account.amount.taking_amount,
         fee_bps: escrow_account.fee_bps,
@@ -209,9 +215,14 @@ fn light_cpi_close<'info>(
         &crate::ID,
         &args.account_meta,
         EscrowAccount {
-            maker: escrow_account.maker,
+            maker: ctx.accounts.maker.key(),
             unique_id: escrow_account.unique_id,
-            tokens: escrow_account.tokens,
+            tokens: Tokens {
+                input_mint: ctx.accounts.input_mint.key(),
+                output_mint: ctx.accounts.output_mint.key(),
+                input_token_program: ctx.accounts.input_token_program.key(),
+                output_token_program: ctx.accounts.output_token_program.key(),
+            },
             amount: escrow_account.amount,
             slippage_bps: escrow_account.slippage_bps,
             fee_bps: escrow_account.fee_bps,
