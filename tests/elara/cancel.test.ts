@@ -56,8 +56,6 @@ describe("elara/cancel_order", () => {
 
   const rpc = createRpc(url, indexer, url);
 
-  /*
-
   it("cancel escrow", async () => {
     const unique_id = new BN(Date.now());
     const protocol_vault = PublicKey.findProgramAddressSync(
@@ -252,7 +250,6 @@ describe("elara/cancel_order", () => {
       "Tokens not correctly credited to protocol vault"
     );
   });
-  */
 
   it("cancel escrow WSOL", async () => {
     const unique_id = new BN(Date.now());
@@ -365,7 +362,7 @@ describe("elara/cancel_order", () => {
     let escrow_data = parseEscrowFromBuffer(buffer);
 
     const vaultATA = await getAssociatedTokenAddress(
-      input_mint,
+      sol_mint,
       protocol_vault[0],
       true
     );

@@ -8,7 +8,7 @@ export async function get_swap(
 ) {
   const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=${input_mint}&outputMint=${output_mint}&amount=2039280&swapMode=ExactOut`;
   const quote = await axios.get(quote_url);
-  // console.log("quote in amount", quote.data.inAmount);
+  console.log("quote in amount", quote.data.inAmount);
   console.log("quote out amount", quote.data.outAmount);
   let config = {
     method: "post",
@@ -24,7 +24,11 @@ export async function get_swap(
     }),
   };
   const swap = await axios.request(config);
-  return swap.data;
+  return {
+    swap: swap.data,
+    inAmount: quote.data.inAmount,
+    outAmount: quote.data.outAmount,
+  };
 }
 
 export async function get_swap_instruction() {

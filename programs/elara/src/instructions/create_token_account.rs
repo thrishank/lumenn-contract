@@ -13,6 +13,7 @@ use jupiter::program::Jupiter;
 
 declare_program!(jupiter);
 
+use crate::state::{Amount, Tokens};
 use crate::{
     error::CustomError, state::EscrowAccount, swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
@@ -27,7 +28,9 @@ pub struct CreateToken<'info> {
     /// CHECK: This account is the owner of the new token account
     pub maker: UncheckedAccount<'info>,
 
-    pub mint: InterfaceAccount<'info, Mint>,
+    // pub mint: InterfaceAccount<'info, Mint>,
+    pub input_mint: InterfaceAccount<'info, Mint>,
+    pub output_mint: InterfaceAccount<'info, Mint>,
 
     /// CHECK: check in program logic
     #[account(mut)]
@@ -42,7 +45,7 @@ pub struct CreateToken<'info> {
 
     #[account(
         mut,
-        associated_token::mint = mint,
+        associated_token::mint = input_mint,
         associated_token::authority = protocol_vault,
         associated_token::token_program = token_program
     )]
@@ -60,9 +63,20 @@ pub struct CreateToken<'info> {
 pub struct CreateTokenAccountArgs {
     pub swap_data: Vec<u8>,
     pub taking_amount: u64,
-    pub escrow_account: EscrowAccount,
+    pub escrow_account: AccountParams,
     pub proof: ValidityProof,
     pub account_meta: CompressedAccountMeta,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct AccountParams {
+    pub unique_id: u64,
+    pub amount: Amount,
+    pub slippage_bps: u16,
+    pub fee_bps: u64,
+    pub expired_at: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 pub fn create_token_account<'info>(
@@ -70,7 +84,7 @@ pub fn create_token_account<'info>(
     args: CreateTokenAccountArgs,
 ) -> Result<()> {
     let expected_ata =
-        get_associated_token_address(&ctx.accounts.maker.key(), &ctx.accounts.mint.key());
+        get_associated_token_address(&ctx.accounts.maker.key(), &ctx.accounts.output_mint.key());
 
     if ctx.accounts.maker_token_ata.key() != expected_ata {
         return Err(error!(CustomError::InvalidTokenAccount));
@@ -102,7 +116,7 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
-    let is_making_sol = ctx.accounts.mint.key().to_string() == SOL_MINT;
+    let is_making_sol = ctx.accounts.input_mint.key().to_string() == SOL_MINT;
     if is_making_sol {
         return Err(error!(CustomError::InvalidCreateAtaInstruction));
     }
@@ -134,16 +148,20 @@ fn light_cpi<'info>(
     amount_swapped: u64,
     taking_amount: u64,
 ) -> Result<()> {
-    msg!("account len: {}", ctx.remaining_accounts.len());
-    let escrow_account = args.escrow_account;
+    let escrow_account = args.escrow_account.clone();
 
     let mut escrow = LightAccount::<'_, EscrowAccount>::new_mut(
         &crate::ID,
         &args.account_meta,
         EscrowAccount {
-            maker: escrow_account.maker,
+            maker: ctx.accounts.maker.key(),
             unique_id: escrow_account.unique_id,
-            tokens: escrow_account.tokens,
+            tokens: Tokens {
+                input_mint: ctx.accounts.input_mint.key(),
+                output_mint: ctx.accounts.output_mint.key(),
+                input_token_program: ctx.accounts.token_program.key(),
+                output_token_program: ctx.accounts.token_program.key(),
+            },
             amount: escrow_account.amount,
             slippage_bps: escrow_account.slippage_bps,
             fee_bps: escrow_account.fee_bps,
@@ -192,7 +210,7 @@ pub fn create_associated_token_account<'info>(
         payer: ctx.accounts.protocol_vault.to_account_info(),
         associated_token: ctx.accounts.maker_token_ata.to_account_info(),
         authority: ctx.accounts.maker.to_account_info(),
-        mint: ctx.accounts.mint.to_account_info(),
+        mint: ctx.accounts.output_mint.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
         token_program: ctx.accounts.token_program.to_account_info(),
     };

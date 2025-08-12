@@ -88,7 +88,4 @@ export const CLOSE_ACCOUNTS = [
   { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
   { pubkey: STATE_TREE, isSigner: false, isWritable: true },
   { pubkey: STATE_QUEUE, isSigner: false, isWritable: true },
-  // ---
-  // { pubkey: COMPUTE_BUDGET_PROGRAM, isSigner: false, isWritable: false },
-  // { pubkey: ASSOCIATED_TOKEN_PROGRAM, isSigner: false, isWritable: false },
 ];

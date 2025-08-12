@@ -17,4 +17,5 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test-cancel = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/cancel.test.ts"
+test-ata = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/ata.test.ts"
 test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
