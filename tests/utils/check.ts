@@ -12,7 +12,7 @@ export async function assertEscrowState({
   rpc,
   address,
   uniqueId,
-  payer,
+  maker,
   inputMint,
   outputMint,
   makingAmount,
@@ -22,7 +22,7 @@ export async function assertEscrowState({
   rpc: ReturnType<typeof import("@lightprotocol/stateless.js")["createRpc"]>;
   address: PublicKey;
   uniqueId: BN;
-  payer: PublicKey;
+  maker: PublicKey;
   inputMint: PublicKey;
   outputMint: PublicKey;
   makingAmount: BN;
@@ -42,7 +42,7 @@ export async function assertEscrowState({
   assert.isDefined(data, "Parsed escrow data is undefined");
 
   assert.isTrue(data.uniqueId.eq(uniqueId), "uniqueId mismatch");
-  assert.equal(data.maker.toString(), payer.toString(), "maker mismatch");
+  assert.equal(data.maker.toString(), maker.toString(), "maker mismatch");
 
   assert.equal(
     data.tokens.inputMint.toString(),

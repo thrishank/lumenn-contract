@@ -9,8 +9,8 @@ import {
 import { Program } from "@coral-xyz/anchor";
 import { Elara } from "../../target/types/elara";
 import {
-  AddressLookupTableAccount,
   ComputeBudgetProgram,
+  Keypair,
   PublicKey,
   Signer,
   SystemProgram,
@@ -58,25 +58,22 @@ describe("elara/init_order", () => {
 
   const rpc = createRpc(url, indexer, url);
 
-  const unique_id = new BN(Date.now());
   const protocol_vault = PublicKey.findProgramAddressSync(
     [Buffer.from("protocol_vault")],
     program.programId
   );
 
-  const seeds: Uint8Array[] = [
-    Buffer.from("escrow"),
-    unique_id.toArrayLike(Buffer, "le", 8),
-    payer.publicKey.toBuffer(),
-  ];
+  it("init order", async () => {
+    const unique_id = new BN(Date.now());
 
-  const assetSeed = deriveAddressSeed(seeds, program.programId);
-  const address = deriveAddress(assetSeed, ADDRESS_TREE);
+    const seeds: Uint8Array[] = [
+      Buffer.from("escrow"),
+      unique_id.toArrayLike(Buffer, "le", 8),
+      payer.publicKey.toBuffer(),
+    ];
 
-  it("init escrow", async () => {
-    console.log("escrow address", address.toString());
-
-    console.log("Initializing order...");
+    const assetSeed = deriveAddressSeed(seeds, program.programId);
+    const address = deriveAddress(assetSeed, ADDRESS_TREE);
 
     const proof = await rpc.getValidityProofV0(undefined, [
       {
@@ -115,7 +112,7 @@ describe("elara/init_order", () => {
     const takingAmount = new BN(1_000_000_000);
     const slippageBps = 50; // 0.5%
 
-    const tx = await program.methods
+    const instruction = await program.methods
       .initializeOrder(
         {
           uniqueId: unique_id,
@@ -149,20 +146,33 @@ describe("elara/init_order", () => {
         outputTokenProgram: TOKEN_PROGRAM_ID,
       })
       .remainingAccounts(INIT_REMAINING_ACCOUNTS)
-      .preInstructions([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-      ])
-      .rpc();
+      .instruction();
+
+    const latestBlockhash = await rpc.getLatestBlockhash();
+    const message = new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: latestBlockhash.blockhash,
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+        instruction,
+      ],
+    }).compileToV0Message();
 
     // transaction size 1012 bytes
 
-    console.log("Order initialized  signature:", tx);
+    const tx = new VersionedTransaction(message);
+    tx.sign([payer]);
+
+    const sig = await rpc.sendTransaction(tx);
+
+    console.log("Order initialized signature:", sig);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     await assertEscrowState({
       rpc,
       address,
       uniqueId: unique_id,
-      payer: payer.publicKey,
+      maker: payer.publicKey,
       inputMint: input_mint,
       outputMint: output_mint,
       makingAmount,
@@ -173,6 +183,7 @@ describe("elara/init_order", () => {
       program.provider.connection,
       makerATA
     );
+
     const vaultAccountAfter = await getAccount(
       program.provider.connection,
       vaultATA
@@ -197,10 +208,12 @@ describe("elara/init_order", () => {
   it("init order with SOL", async () => {
     const unique_id2 = new BN(Date.now());
 
+    const maker = Keypair.generate();
+
     const seeds: Uint8Array[] = [
       Buffer.from("escrow"),
       unique_id2.toArrayLike(Buffer, "le", 8),
-      payer.publicKey.toBuffer(),
+      maker.publicKey.toBuffer(),
     ];
 
     const assetSeed = deriveAddressSeed(seeds, program.programId);
@@ -216,25 +229,36 @@ describe("elara/init_order", () => {
 
     const validityProof = proof.compressedProof;
 
-    const wSOL_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
-
-    const vaultATA = await getAssociatedTokenAddress(
-      input_mint,
+    const solVaultATA = await getAssociatedTokenAddress(
+      sol_mint,
       protocol_vault[0],
       true
     );
 
-    const vaultAccountBefore = await getAccount(
+    const solVaultAccountBefore = await getAccount(
       program.provider.connection,
-      vaultATA
+      solVaultATA
+    );
+    const solVaultBalanceBefore = Number(solVaultAccountBefore.amount ?? 0);
+
+    const makingAmount = new BN(1_000_000);
+    const rentExempt = 890880;
+
+    const tx2 = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: payer.publicKey,
+        toPubkey: maker.publicKey,
+        lamports: makingAmount.toNumber() + rentExempt,
+      })
     );
 
-    const makerBalanceBefore = await rpc.getBalance(payer.publicKey);
-    const vaultBalanceBefore = Number(vaultAccountBefore.amount ?? 0);
+    await rpc.sendTransaction(tx2, [payer]);
 
-    const makingAmount = new BN(203_92800);
+    const wSOL_ata = await getAssociatedTokenAddress(sol_mint, maker.publicKey);
+
     const takingAmount = new BN(1_000_000_000);
-    const tx = await program.methods
+
+    const instruction = await program.methods
       .initializeOrder(
         {
           uniqueId: unique_id2,
@@ -261,65 +285,80 @@ describe("elara/init_order", () => {
       )
       .accounts({
         payer: payer.publicKey,
-        maker: payer.publicKey,
+        maker: maker.publicKey,
         inputMint: sol_mint,
         outputMint: output_mint,
         inputTokenProgram: TOKEN_PROGRAM_ID,
         outputTokenProgram: TOKEN_PROGRAM_ID,
       })
       .remainingAccounts(INIT_REMAINING_ACCOUNTS)
-      .preInstructions([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+      .instruction();
+
+    // transaction size 1147 bytes
+
+    const latestBlockhash = await rpc.getLatestBlockhash();
+    const message = new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: latestBlockhash.blockhash,
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
         createAssociatedTokenAccountIdempotentInstruction(
           payer.publicKey,
           wSOL_ata,
-          payer.publicKey,
+          maker.publicKey,
           sol_mint
         ),
         SystemProgram.transfer({
-          fromPubkey: payer.publicKey,
+          fromPubkey: maker.publicKey,
           toPubkey: wSOL_ata,
           lamports: makingAmount.toNumber(),
         }),
         createSyncNativeInstruction(wSOL_ata),
-      ])
-      .postInstructions([
+        instruction,
         createCloseAccountInstruction(
           wSOL_ata,
           payer.publicKey,
-          payer.publicKey
+          maker.publicKey
         ),
-      ])
-      .rpc();
-    console.log("Order initialized  signature:", tx);
+      ],
+    }).compileToV0Message();
+
+    const tx = new VersionedTransaction(message);
+    tx.sign([payer, maker]);
+
+    const sig = await rpc.sendTransaction(tx);
+    console.log("Order initialized signature:", sig);
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     await assertEscrowState({
       rpc,
       address,
       uniqueId: unique_id2,
-      payer: payer.publicKey,
+      maker: maker.publicKey,
       inputMint: sol_mint,
       outputMint: output_mint,
       makingAmount,
       takingAmount,
     });
 
-    const vaultAccountAfter = await getAccount(
+    const makerBalanceAfter = await rpc.getBalance(maker.publicKey);
+
+    const solVaultAccountAfter = await getAccount(
       program.provider.connection,
-      vaultATA
+      solVaultATA,
+      "processed"
     );
-
-    const makerBalanceAfter = await rpc.getBalance(payer.publicKey);
-    const vaultBalanceAfter = Number(vaultAccountAfter.amount ?? 0);
-
-    // assert.equal(
-    //   makerBalanceBefore - makerBalanceAfter,
-    //   makingAmount.toNumber(),
-    //   "Tokens not correctly debited from maker"
-    // );
+    const solVaultBalanceAfter = Number(solVaultAccountAfter.amount ?? 0);
 
     assert.equal(
-      vaultBalanceAfter - vaultBalanceBefore,
+      makerBalanceAfter,
+      rentExempt,
+      "Tokens not correctly debited from maker"
+    );
+
+    assert.equal(
+      solVaultBalanceAfter - solVaultBalanceBefore,
       makingAmount.toNumber(),
       "Tokens not correctly credited to protocol vault"
     );

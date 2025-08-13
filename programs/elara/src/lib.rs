@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 use light_sdk::{cpi::CpiSigner, derive_light_cpi_signer};
@@ -23,6 +25,7 @@ pub mod elara {
     use super::*;
 
     /// This function creates a compressed escrow account using Light Protocol's state compression
+    /// stores the order details amount, slippage and tokens
     /// Transfers the maker's input tokens to the protocol vault
     pub fn initialize_order<'info>(
         ctx: Context<'_, '_, '_, 'info, InitializeOrder<'info>>,

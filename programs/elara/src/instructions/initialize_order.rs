@@ -81,11 +81,6 @@ pub fn init<'info>(
     require!(order_args.taking_amount > 0, CustomError::InvalidAmount);
 
     require!(
-        order_args.slippage_bps <= 10000,
-        CustomError::InvalidSlippage
-    ); // Max 100%
-
-    require!(
         ctx.accounts.input_mint.key() != ctx.accounts.output_mint.key(),
         CustomError::SameMints
     );
@@ -137,7 +132,7 @@ pub fn init<'info>(
     escrow.amount.making_amount = order_args.making_amount;
     escrow.amount.taking_amount = order_args.taking_amount;
     escrow.slippage_bps = order_args.slippage_bps;
-    escrow.fee_bps = 0; // TODO: set fee bps
+    escrow.fee_bps = 10;
     escrow.expired_at = order_args.expired_at.unwrap_or(0);
     escrow.created_at = Clock::get()?.unix_timestamp;
     escrow.updated_at = Clock::get()?.unix_timestamp;
@@ -153,6 +148,7 @@ pub fn init<'info>(
 
     cpi.invoke_light_system_program(light_cpi_accounts)
         .map_err(ProgramError::from)?;
+
     emit!(OrderInitialized {
         escrow_address,
         maker: ctx.accounts.maker.key(),
@@ -202,7 +198,6 @@ pub struct LightArgs {
     pub output_state_tree_index: u8,
 }
 
-// TODO: create a instruction and self invoke for emit
 #[event]
 pub struct OrderInitialized {
     pub escrow_address: Pubkey,
