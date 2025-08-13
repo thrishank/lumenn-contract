@@ -41,28 +41,6 @@ pub mod elara {
         cancel_order::cancel(ctx, args)
     }
 
-    // fill the order when the price reaches the user target
-    // this instruction will be called a worker that is monitoring the price
-    // swap the token in vault using jupiter cpi
-    // close the light compressed escrow account
-    // transfer the output tokens to the maker
-    pub fn fill_order<'info>(
-        ctx: Context<'_, '_, '_, 'info, FillOrder<'info>>,
-        args: FillOrderParams,
-    ) -> Result<()> {
-        fill_order::fill(ctx, args)
-    }
-
-    // partial fill the order when the price reaches the user target
-    // used when there is limited liquidity in the market
-    // light compressed escrow account state udpated not closed
-    pub fn partial_fill<'info>(
-        ctx: Context<'_, '_, '_, 'info, PartialFill<'info>>,
-        args: PartialFillOrderParams,
-    ) -> Result<()> {
-        partial_fill_order::partial_fill(ctx, args)
-    }
-
     // to send the output tokens to the maker, maker needs to have an associated token account
     // usallay created when initializing the order but if they close we create it
     // take samll amount from the making amount and swap it SOL and create the ATA
@@ -80,6 +58,31 @@ pub mod elara {
         args: CreateTokenAccountWsolArgs,
     ) -> Result<()> {
         create_ata_wsol::create_token_account(ctx, args)
+    }
+
+    // fill the order when the price reaches the user target
+    // this instruction will be called a worker that is monitoring the price
+    // swap the token in vault using jupiter cpi
+    // close the light compressed escrow account
+    // transfer the output tokens to the maker
+    #[instruction(discriminator = [2])]
+    pub fn fill_order<'info>(
+        ctx: Context<'_, '_, '_, 'info, FillOrder<'info>>,
+        args: FillOrderParams,
+    ) -> Result<()> {
+        fill_order::fill(ctx, args)
+        //TODO: decrease the transaction size
+    }
+
+    // partial fill the order when the price reaches the user target
+    // used when there is limited liquidity in the market
+    // light compressed escrow account state udpated not closed
+    #[instruction(discriminator = [3])]
+    pub fn partial_fill<'info>(
+        ctx: Context<'_, '_, '_, 'info, PartialFill<'info>>,
+        args: PartialFillOrderParams,
+    ) -> Result<()> {
+        partial_fill_order::partial_fill(ctx, args)
     }
 }
 

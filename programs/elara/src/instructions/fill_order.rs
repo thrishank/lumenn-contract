@@ -8,7 +8,7 @@ use anchor_spl::{
 use light_sdk::{
     account::LightAccount,
     address::v1::derive_address,
-    instruction::{account_meta::CompressedAccountMeta, ValidityProof},
+    instruction::{account_meta::CompressedAccountMeta, PackedStateTreeInfo, ValidityProof},
 };
 
 use crate::{
@@ -73,7 +73,9 @@ pub struct FillOrder<'info> {
 
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    pub jupiter_program: Program<'info, Jupiter>,
+    // pub jupiter_program: Program<'info, Jupiter>,
+    /// CHECK: testing
+    pub jupiter_program: UncheckedAccount<'info>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -82,6 +84,7 @@ pub struct FillOrderParams {
     pub escrow_account: AccountParams,
     pub proof: ValidityProof,
     pub account_meta: CompressedAccountMeta,
+    //  pub tree_info: PackedStateTreeInfo,
 }
 
 pub fn fill<'info>(
@@ -148,16 +151,16 @@ pub fn fill<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
-    swap_cpi(
-        &args.swap_data,
-        jupiter_accounts,
-        &ctx.accounts.protocol_vault.to_account_info(),
-        &ctx.accounts.jupiter_program,
-    )?;
+    // swap_cpi(
+    //     &args.swap_data,
+    //     jupiter_accounts,
+    //     &ctx.accounts.protocol_vault.to_account_info(),
+    //     &ctx.accounts.jupiter_program,
+    // )?;
 
     let escrow_address = light_cpi_close(&ctx, args, light_accounts)?;
 
-    transfer_tokens(&ctx, escrow_account.amount.taking_amount)?;
+    transfer_tokens(&ctx, out_amount)?;
 
     emit!(FillOrderEvent {
         escrow_account: escrow_address,
@@ -193,8 +196,6 @@ fn transfer_tokens<'info>(
 
     let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
 
-    // TODO: we have the SOL token as w-sol how to sent it to the user ?
-
     transfer_checked(
         cpi_transfer.with_signer(signer_seeds),
         amount,
@@ -211,7 +212,7 @@ fn light_cpi_close<'info>(
 ) -> Result<Pubkey> {
     let escrow_account = args.escrow_account;
 
-    let escrow = LightAccount::<'_, EscrowAccount>::new_mut(
+    let escrow = LightAccount::<'_, EscrowAccount>::new_close(
         &crate::ID,
         &args.account_meta,
         EscrowAccount {

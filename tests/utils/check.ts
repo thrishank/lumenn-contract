@@ -92,5 +92,9 @@ export async function assertEscrowDoesNotExist({
   } catch (e) {
     // Expected if account is removed
   }
-  assert.isNotOk(account, "Escrow account should not exist after cancellation");
+  assert.isNotOk(
+    account,
+    "Escrow account should not exist after cancellation. Address: " +
+      address.toString()
+  );
 }

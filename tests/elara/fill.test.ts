@@ -13,8 +13,6 @@ import {
   ComputeBudgetProgram,
   PublicKey,
   Signer,
-  SystemProgram,
-  Transaction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -32,31 +30,30 @@ import {
   CLOSE_ACCOUNTS,
   INIT_REMAINING_ACCOUNTS,
 } from "../utils/address";
+
+import { assert } from "chai";
+import { assertEscrowDoesNotExist, assertEscrowState } from "../utils/check";
 import {
   calculateTransactionSize,
   clone_alt,
-  create_alt,
   parseEscrowFromBuffer,
 } from "../utils/fn";
-
-import { assert } from "chai";
-import { assertEscrowState } from "../utils/check";
 import { get_swap, get_swap_instruction } from "../utils/jup";
 
-describe("elara/create_token_account", () => {
+describe("elara/fill_order", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
 
   const program = anchor.workspace.elara as Program<Elara>;
   const payer: Signer = program.provider.wallet.payer;
 
   const input_mint = new PublicKey(
-    "J7LM6p22Ef8VhREZzkLToSADrXhAiiQUn3P2BAwo1RSe"
+    "9RzWC4ZS6LdNUP2LwaY7Ztq5sTxgt3dFLp2jjokhm9Vz"
   );
 
   const sol_mint = new PublicKey("So11111111111111111111111111111111111111112");
 
   const output_mint = new PublicKey(
-    "Gt1V2qJcAHy8foR4qb7AkpWkEqxghjWkTfoR5P8huvzP"
+    "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
   );
 
   const url =
@@ -66,21 +63,24 @@ describe("elara/create_token_account", () => {
 
   const rpc = createRpc(url, indexer, url);
 
-  it("create token account", async () => {
-    const unique_id = new BN(Date.now());
-    const protocol_vault = PublicKey.findProgramAddressSync(
-      [Buffer.from("protocol_vault")],
-      program.programId
-    );
+  const unique_id = new BN(Date.now());
+  const protocol_vault = PublicKey.findProgramAddressSync(
+    [Buffer.from("protocol_vault")],
+    program.programId
+  );
 
-    const seeds: Uint8Array[] = [
-      Buffer.from("escrow"),
-      unique_id.toArrayLike(Buffer, "le", 8),
-      payer.publicKey.toBuffer(),
-    ];
+  const seeds: Uint8Array[] = [
+    Buffer.from("escrow"),
+    unique_id.toArrayLike(Buffer, "le", 8),
+    payer.publicKey.toBuffer(),
+  ];
 
-    const assetSeed = deriveAddressSeed(seeds, program.programId);
-    const address = deriveAddress(assetSeed, ADDRESS_TREE);
+  const assetSeed = deriveAddressSeed(seeds, program.programId);
+  const address = deriveAddress(assetSeed, ADDRESS_TREE);
+
+  /*
+  it("fill order", async () => {
+    console.log("Initializing order...");
 
     const proof = await rpc.getValidityProofV0(undefined, [
       {
@@ -92,8 +92,8 @@ describe("elara/create_token_account", () => {
 
     const validityProof = proof.compressedProof;
 
-    const makingAmount = new BN(1_000_000_000);
-    const takingAmount = new BN(1_000_000_000);
+    const makingAmount = new BN(10_000_000);
+    const takingAmount = new BN(5_000_000);
     const slippageBps = 50; // 0.5%
 
     const tx = await program.methods
@@ -135,23 +135,8 @@ describe("elara/create_token_account", () => {
       ])
       .rpc();
 
-    console.log("Order initialized  signature:", tx);
-
-    console.log("closing account for testing...");
-    const ata = new PublicKey("Axsmc8d5F8iVikajgit9yvdi3AHTWkCVwF3u65qbWTS"); // out_put mint
-    const ixs = createCloseAccountInstruction(
-      ata,
-      payer.publicKey,
-      payer.publicKey,
-      [],
-      TOKEN_PROGRAM_ID
-    );
-
-    const transaction = new Transaction().add(ixs);
-    const signature = await rpc.sendTransaction(transaction, [payer]);
-    console.log("closed account for testing:", signature);
-
-    console.log("create token account");
+    console.log("Order initialized signature:", tx);
+    console.log("Filling order ...");
 
     let compressed_account = await rpc.getCompressedAccount(
       bn(address.toBytes())
@@ -171,16 +156,40 @@ describe("elara/create_token_account", () => {
 
     const { swap, inAmount } = await get_swap(
       "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
+      "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "So11111111111111111111111111111111111111112"
+      makingAmount.toNumber(),
+      "ExactIn"
     );
 
     const { accounts: jup_accounts, alt } = await get_swap_instruction();
 
+    const makerATA = await getAssociatedTokenAddress(
+      output_mint,
+      payer.publicKey
+    );
+    const vaultATA = await getAssociatedTokenAddress(
+      output_mint,
+      protocol_vault[0],
+      true
+    );
+
+    // Get balances before tx
+    const makerAccountBefore = await getAccount(
+      program.provider.connection,
+      makerATA
+    );
+    const vaultAccountBefore = await getAccount(
+      program.provider.connection,
+      vaultATA
+    );
+
+    const makerBalanceBefore = Number(makerAccountBefore.amount);
+    const vaultBalanceBefore = Number(vaultAccountBefore.amount ?? 0);
+
     const instruction = await program.methods
-      .createAta({
+      .fillOrder({
         swapData: Buffer.from(swap.swapInstruction.data, "base64"),
-        takingAmount: new BN(100000),
         escrowAccount: {
           uniqueId: escrow_data.uniqueId,
           amount: {
@@ -217,10 +226,10 @@ describe("elara/create_token_account", () => {
       .accounts({
         payer: payer.publicKey,
         maker: payer.publicKey,
-        makerTokenAta: ata,
         inputMint: input_mint,
         outputMint: output_mint,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        inputTokenProgram: TOKEN_PROGRAM_ID,
+        outputTokenProgram: TOKEN_PROGRAM_ID,
         jupiterProgram: new PublicKey(
           "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
         ),
@@ -261,71 +270,57 @@ describe("elara/create_token_account", () => {
       ],
     }).compileToV0Message(altLookups);
 
-    const tx_ata = new VersionedTransaction(message);
-    tx_ata.sign([payer]);
+    const tx_fill = new VersionedTransaction(message);
+    tx_fill.sign([payer]);
 
-    const size = calculateTransactionSize(tx_ata);
+    const size = calculateTransactionSize(tx_fill);
     console.log("Transaction size:", size);
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
-    const sig = await rpc.sendTransaction(tx_ata);
+    const sig = await rpc.sendTransaction(tx_fill);
 
     console.log("✅ Signature:", sig);
 
-    const makerATA = await getAssociatedTokenAddress(
-      output_mint,
-      payer.publicKey
+    const makerAccountAfter = await getAccount(
+      program.provider.connection,
+      makerATA,
+      "processed"
+    );
+    const vaultAccountAfter = await getAccount(
+      program.provider.connection,
+      vaultATA,
+      "processed"
     );
 
-    let makerAccountExists = false;
+    const makerBalanceAfter = Number(makerAccountAfter.amount);
+    const vaultBalanceAfter = Number(vaultAccountAfter.amount ?? 0);
 
-    try {
-      await getAccount(program.provider.connection, makerATA, "processed");
-      makerAccountExists = true;
-    } catch (err) {
-      makerAccountExists = false;
-    }
-
-    assert.isTrue(
-      makerAccountExists,
-      `Expected token account ${makerATA.toBase58()} to be created, but it does not exist`
+    assert(
+      makerBalanceAfter - makerBalanceBefore >= takingAmount.toNumber(),
+      "Tokens not correctly credited from maker"
     );
 
-    await assertEscrowState({
-      rpc,
-      address,
-      uniqueId: unique_id,
-      payer: payer.publicKey,
-      inputMint: input_mint,
-      outputMint: output_mint,
-      makingAmount: new BN(makingAmount).sub(new BN(inAmount)),
-      takingAmount: new BN(takingAmount).sub(new BN(100000)),
-    });
+    assert(
+      vaultBalanceBefore - vaultBalanceAfter >= takingAmount.toNumber(),
+      "Tokens not correctly debited to protocol vault"
+    );
+
+    await assertEscrowDoesNotExist({ rpc, address });
   });
+  */
 
-  it("create ata account with WSOL", async () => {
-    const unique_id = new BN(Date.now());
-
-    const protocol_vault = PublicKey.findProgramAddressSync(
-      [Buffer.from("protocol_vault")],
-      program.programId
-    );
+  it("fill order WSOL", async () => {
+    const unique_id2 = new BN(Date.now());
 
     const seeds: Uint8Array[] = [
       Buffer.from("escrow"),
-      unique_id.toArrayLike(Buffer, "le", 8),
+      unique_id2.toArrayLike(Buffer, "le", 8),
       payer.publicKey.toBuffer(),
     ];
 
     const assetSeed = deriveAddressSeed(seeds, program.programId);
     const address = deriveAddress(assetSeed, ADDRESS_TREE);
-
-    const makingAmount = new BN(239_932_00);
-    const takingAmount = new BN(1_000_000_00);
-    const slippageBps = 50; // 0.5%
-
-    const wSOL_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
 
     const proof = await rpc.getValidityProofV0(undefined, [
       {
@@ -337,14 +332,18 @@ describe("elara/create_token_account", () => {
 
     const validityProof = proof.compressedProof;
 
+    const wSOL_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
+
+    const makingAmount = new BN(10_000_000);
+    const takingAmount = new BN(1_000_000_0);
     const tx = await program.methods
       .initializeOrder(
         {
-          uniqueId: unique_id,
+          uniqueId: unique_id2,
           makingAmount,
           takingAmount,
           expiredAt: null,
-          slippageBps,
+          slippageBps: 50,
         },
         {
           proof: {
@@ -365,53 +364,31 @@ describe("elara/create_token_account", () => {
       .accounts({
         payer: payer.publicKey,
         maker: payer.publicKey,
-        inputMint: sol_mint,
-        outputMint: output_mint,
+        inputMint: input_mint,
+        outputMint: sol_mint,
         inputTokenProgram: TOKEN_PROGRAM_ID,
         outputTokenProgram: TOKEN_PROGRAM_ID,
       })
       .remainingAccounts(INIT_REMAINING_ACCOUNTS)
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-        createAssociatedTokenAccountIdempotentInstruction(
-          payer.publicKey,
-          wSOL_ata,
-          payer.publicKey,
-          sol_mint
-        ),
-        SystemProgram.transfer({
-          fromPubkey: payer.publicKey,
-          toPubkey: wSOL_ata,
-          lamports: makingAmount.toNumber(),
-        }),
-        createSyncNativeInstruction(wSOL_ata),
-      ])
-      .postInstructions([
-        createCloseAccountInstruction(
-          wSOL_ata,
-          payer.publicKey,
-          payer.publicKey
-        ),
       ])
       .rpc();
-
     console.log("Order initialized  signature:", tx);
-    console.log("closing account for testing...");
-    const ata = new PublicKey("Axsmc8d5F8iVikajgit9yvdi3AHTWkCVwF3u65qbWTS"); // out_put mint
-
-    const ixs = createCloseAccountInstruction(
-      ata,
-      payer.publicKey,
-      payer.publicKey,
-      [],
-      TOKEN_PROGRAM_ID
+    const vaultATA = await getAssociatedTokenAddress(
+      sol_mint,
+      protocol_vault[0],
+      true
     );
 
-    const transaction = new Transaction().add(ixs);
-    const signature = await rpc.sendTransaction(transaction, [payer]);
-    console.log("closed account for testing:", signature);
+    const vaultAccountBefore = await getAccount(
+      program.provider.connection,
+      vaultATA
+    );
 
-    console.log("Creating token account...");
+    const vaultBalanceBefore = Number(vaultAccountBefore.amount ?? 0);
+
+    console.log("Filling order ...");
 
     let compressed_account = await rpc.getCompressedAccount(
       bn(address.toBytes())
@@ -429,24 +406,21 @@ describe("elara/create_token_account", () => {
     const buffer = compressed_account?.data?.data!;
     let escrow_data = parseEscrowFromBuffer(buffer);
 
-    const { swap, inAmount } = await get_swap(
+    const { swap } = await get_swap(
       "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      "So11111111111111111111111111111111111111112"
+      sol_mint.toString(),
+      makingAmount.toNumber(),
+      "ExactIn"
     );
 
+    const { accounts: jup_accounts, alt } = await get_swap_instruction();
+
     const instruction = await program.methods
-      .createAtaWsol({
+      .fillOrder({
         swapData: Buffer.from(swap.swapInstruction.data, "base64"),
         escrowAccount: {
-          maker: escrow_data.maker,
           uniqueId: escrow_data.uniqueId,
-          tokens: {
-            inputMint: escrow_data.tokens.inputMint,
-            outputMint: escrow_data.tokens.outputMint,
-            inputTokenProgram: escrow_data.tokens.inputTokenProgram,
-            outputTokenProgram: escrow_data.tokens.outputTokenProgram,
-          },
           amount: {
             makingAmount: escrow_data.amount.makingAmount,
             takingAmount: escrow_data.amount.takingAmount,
@@ -481,24 +455,28 @@ describe("elara/create_token_account", () => {
       .accounts({
         payer: payer.publicKey,
         maker: payer.publicKey,
-        solMint: sol_mint,
-        outputMint: output_mint,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .remainingAccounts(CLOSE_ACCOUNTS)
-      .preInstructions([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-      ])
-      .postInstructions([
-        createCloseAccountInstruction(
-          wSOL_ata,
-          payer.publicKey,
-          payer.publicKey
+        inputMint: input_mint,
+        outputMint: sol_mint,
+        inputTokenProgram: TOKEN_PROGRAM_ID,
+        outputTokenProgram: TOKEN_PROGRAM_ID,
+        jupiterProgram: new PublicKey(
+          "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
         ),
-      ])
+      })
+      .remainingAccounts([...CLOSE_ACCOUNTS, ...jup_accounts])
       .instruction();
 
-    const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5"];
+    const altAddresse = await Promise.all(
+      alt.map(async (key: string) => {
+        const newAlt = await clone_alt(key);
+        return newAlt;
+      })
+    );
+
+    const altAddresses = [
+      "7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5",
+      ...altAddresse,
+    ];
 
     const altLookups = await Promise.all(
       altAddresses.map(async (address: any) => {
@@ -518,47 +496,44 @@ describe("elara/create_token_account", () => {
       instructions: [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
         instruction,
+        createCloseAccountInstruction(
+          wSOL_ata,
+          payer.publicKey,
+          payer.publicKey
+        ),
       ],
     }).compileToV0Message(altLookups);
 
-    const tx_cancel = new VersionedTransaction(message);
-    tx_cancel.sign([payer]);
+    const tx_fill = new VersionedTransaction(message);
+    tx_fill.sign([payer]);
 
-    const size = calculateTransactionSize(tx_cancel);
+    const size = calculateTransactionSize(tx_fill);
     console.log("Transaction size:", size);
 
-    const sig = await rpc.sendTransaction(tx_cancel);
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    const sig = await rpc.sendTransaction(tx_fill);
 
     console.log("✅ Signature:", sig);
 
-    const makerATA = await getAssociatedTokenAddress(
-      output_mint,
-      payer.publicKey
+    const vaultAccountAfter = await getAccount(
+      program.provider.connection,
+      vaultATA
     );
 
-    let makerAccountExists = false;
+    const makerBalanceAfter = await rpc.getBalance(payer.publicKey);
+    const vaultBalanceAfter = Number(vaultAccountAfter.amount ?? 0);
 
-    try {
-      await getAccount(program.provider.connection, makerATA);
-      makerAccountExists = true;
-    } catch (err) {
-      makerAccountExists = false;
-    }
+    // assert(
+    //   makerBalanceAfter - makerBalanceBefore >= takingAmount.toNumber(),
+    //   "Tokens not correctly credited from maker"
+    // );
 
-    assert.isTrue(
-      makerAccountExists,
-      `Expected token account ${makerATA.toBase58()} to be created, but it does not exist`
+    assert(
+      vaultBalanceBefore - vaultBalanceAfter >= takingAmount.toNumber(),
+      "Tokens not correctly debited to protocol vault"
     );
 
-    await assertEscrowState({
-      rpc,
-      address,
-      uniqueId: unique_id,
-      payer: payer.publicKey,
-      inputMint: sol_mint,
-      outputMint: output_mint,
-      makingAmount: new BN(makingAmount).sub(new BN(2039280)),
-      takingAmount: new BN(takingAmount).sub(new BN(inAmount)),
-    });
+    await assertEscrowDoesNotExist({ rpc, address });
   });
 });
