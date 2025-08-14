@@ -56,7 +56,7 @@ describe("elara/init_order", () => {
 
   const indexer = "http://34.69.251.52:8784";
 
-  const rpc = createRpc(url, indexer, url);
+  const rpc = createRpc(url, url, url);
 
   const protocol_vault = PublicKey.findProgramAddressSync(
     [Buffer.from("protocol_vault")],
@@ -118,7 +118,7 @@ describe("elara/init_order", () => {
           uniqueId: unique_id,
           makingAmount,
           takingAmount,
-          expiredAt: null,
+          expiredAt: new BN(123141242141),
           slippageBps,
         },
         {

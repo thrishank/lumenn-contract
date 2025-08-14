@@ -73,7 +73,7 @@ pub struct AccountParams {
     pub unique_id: u64,
     pub amount: Amount,
     pub slippage_bps: u16,
-    pub fee_bps: u64,
+    pub fee_bps: u16,
     pub expired_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
@@ -148,7 +148,7 @@ fn light_cpi<'info>(
     amount_swapped: u64,
     taking_amount: u64,
 ) -> Result<()> {
-    let escrow_account = args.escrow_account.clone();
+    let escrow_account = args.escrow_account;
 
     let mut escrow = LightAccount::<'_, EscrowAccount>::new_mut(
         &crate::ID,

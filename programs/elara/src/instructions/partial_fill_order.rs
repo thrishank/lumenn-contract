@@ -293,5 +293,5 @@ pub struct PartialFillOrderEvent {
     pub in_amount: u64,
     pub out_amount: u64,
     pub slippage_bps: u16,
-    pub fee_bps: u64,
+    pub fee_bps: u16,
 }

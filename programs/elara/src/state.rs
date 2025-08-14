@@ -10,11 +10,11 @@ pub struct EscrowAccount {
     pub unique_id: u64,
     pub tokens: Tokens,
     pub amount: Amount,
-    pub slippage_bps: u16,
-    pub fee_bps: u64,
     pub expired_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
+    pub slippage_bps: u16,
+    pub fee_bps: u16,
 }
 
 #[derive(

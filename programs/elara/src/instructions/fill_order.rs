@@ -283,7 +283,7 @@ pub struct FillOrderEvent {
     pub output_mint: Pubkey,
     pub in_amount: u64,
     pub out_amount: u64,
-    pub fee_bps: u64,
+    pub fee_bps: u16,
 }
 
 // Jupiter route types

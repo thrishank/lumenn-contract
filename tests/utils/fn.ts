@@ -52,11 +52,12 @@ export function parseEscrowFromBuffer(buffer: Buffer): Escrow {
   const making_amount = buffer.readBigUInt64LE(184);
   const taking_amount = buffer.readBigUInt64LE(192);
 
-  const slippage_bps = buffer.readBigUInt64LE(200);
-  const fee_bps = buffer.readBigUInt64LE(202);
-  const expired_at = buffer.readBigInt64LE(210);
-  const created_at = buffer.readBigInt64LE(218);
-  const updated_at = buffer.readBigInt64LE(226);
+  const expired_at = buffer.readBigInt64LE(200);
+  const created_at = buffer.readBigInt64LE(208);
+  const updated_at = buffer.readBigInt64LE(216);
+
+  const slippage_bps = buffer.readUInt16LE(224);
+  const fee_bps = buffer.readUInt16LE(226);
 
   return {
     maker: new PublicKey(maker_bytes),
