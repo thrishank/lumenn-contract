@@ -1,9 +1,13 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::{create, Create};
 use anchor_spl::{
     associated_token::{get_associated_token_address, AssociatedToken},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
+use light_sdk::address::v1::derive_address;
+use light_sdk::instruction::PackedStateTreeInfo;
 use light_sdk::{
     account::LightAccount,
     instruction::{account_meta::CompressedAccountMeta, ValidityProof},
@@ -13,7 +17,7 @@ use jupiter::program::Jupiter;
 
 declare_program!(jupiter);
 
-use crate::state::{Amount, Tokens};
+use crate::state::{AccountParams, Tokens};
 use crate::{
     error::CustomError, state::EscrowAccount, swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
@@ -43,15 +47,16 @@ pub struct CreateToken<'info> {
     )]
     pub protocol_vault: SystemAccount<'info>,
 
-    #[account(
-        mut,
-        associated_token::mint = input_mint,
-        associated_token::authority = protocol_vault,
-        associated_token::token_program = token_program
-    )]
-    pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
+    // #[account(
+    //     mut,
+    //     associated_token::mint = input_mint,
+    //     associated_token::authority = protocol_vault,
+    //     associated_token::token_program = input_token_program
+    // )]
+    // pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
+    pub input_token_program: Interface<'info, TokenInterface>,
+    pub output_token_program: Interface<'info, TokenInterface>,
 
-    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     // pub jupiter_program: Program<'info, Jupiter>,
@@ -65,18 +70,8 @@ pub struct CreateTokenAccountArgs {
     pub taking_amount: u64,
     pub escrow_account: AccountParams,
     pub proof: ValidityProof,
-    pub account_meta: CompressedAccountMeta,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Copy)]
-pub struct AccountParams {
-    pub unique_id: u64,
-    pub amount: Amount,
-    pub slippage_bps: u16,
-    pub fee_bps: u16,
-    pub expired_at: i64,
-    pub created_at: i64,
-    pub updated_at: i64,
+    pub tree_info: PackedStateTreeInfo,
+    pub output_state_tree_index: u8,
 }
 
 pub fn create_token_account<'info>(
@@ -150,17 +145,34 @@ fn light_cpi<'info>(
 ) -> Result<()> {
     let escrow_account = args.escrow_account;
 
+    let (address, _address_seed) = derive_address(
+        &[
+            b"escrow",
+            escrow_account.unique_id.to_le_bytes().as_ref(),
+            ctx.accounts.maker.key().as_ref(),
+        ],
+        &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
+            .expect("Invalid merkle tree pubkey"),
+        &crate::ID,
+    );
+
+    let account_meta = CompressedAccountMeta {
+        address,
+        tree_info: args.tree_info,
+        output_state_tree_index: args.output_state_tree_index,
+    };
+
     let mut escrow = LightAccount::<'_, EscrowAccount>::new_mut(
         &crate::ID,
-        &args.account_meta,
+        &account_meta,
         EscrowAccount {
             maker: ctx.accounts.maker.key(),
             unique_id: escrow_account.unique_id,
             tokens: Tokens {
                 input_mint: ctx.accounts.input_mint.key(),
                 output_mint: ctx.accounts.output_mint.key(),
-                input_token_program: ctx.accounts.token_program.key(),
-                output_token_program: ctx.accounts.token_program.key(),
+                input_token_program: ctx.accounts.input_token_program.key(),
+                output_token_program: ctx.accounts.output_token_program.key(),
             },
             amount: escrow_account.amount,
             slippage_bps: escrow_account.slippage_bps,
@@ -171,6 +183,11 @@ fn light_cpi<'info>(
         },
     )
     .map_err(ProgramError::from)?;
+
+    require!(
+        *escrow.owner() == crate::ID,
+        ErrorCode::AccountOwnedByWrongProgram
+    );
 
     escrow.amount.making_amount = escrow
         .amount
@@ -212,7 +229,7 @@ pub fn create_associated_token_account<'info>(
         authority: ctx.accounts.maker.to_account_info(),
         mint: ctx.accounts.output_mint.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
-        token_program: ctx.accounts.token_program.to_account_info(),
+        token_program: ctx.accounts.output_token_program.to_account_info(),
     };
 
     let cpi_program = ctx.accounts.associated_token_program.to_account_info();

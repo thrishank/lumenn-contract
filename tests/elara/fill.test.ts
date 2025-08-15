@@ -78,7 +78,6 @@ describe("elara/fill_order", () => {
   const assetSeed = deriveAddressSeed(seeds, program.programId);
   const address = deriveAddress(assetSeed, ADDRESS_TREE);
 
-  /*
   it("fill order", async () => {
     console.log("Initializing order...");
 
@@ -92,8 +91,8 @@ describe("elara/fill_order", () => {
 
     const validityProof = proof.compressedProof;
 
-    const makingAmount = new BN(10_000_000);
-    const takingAmount = new BN(5_000_000);
+    const makingAmount = new BN(1_000_000);
+    const takingAmount = new BN(500_000);
     const slippageBps = 50; // 0.5%
 
     const tx = await program.methods
@@ -211,17 +210,14 @@ describe("elara/fill_order", () => {
             c: validityProof1.c,
           },
         },
-        accountMeta: {
-          address: compressed_account.address,
-          treeInfo: {
-            rootIndex: proof1.rootIndices[0],
-            merkleTreePubkeyIndex: 0,
-            queuePubkeyIndex: 1,
-            proveByIndex: false,
-            leafIndex: compressed_account.leafIndex,
-          },
-          outputStateTreeIndex: 0,
+        treeInfo: {
+          rootIndex: proof1.rootIndices[0],
+          merkleTreePubkeyIndex: 0,
+          queuePubkeyIndex: 1,
+          proveByIndex: false,
+          leafIndex: compressed_account.leafIndex,
         },
+        outputStateTreeIndex: 0,
       })
       .accounts({
         payer: payer.publicKey,
@@ -308,7 +304,6 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
-  */
 
   it("fill order WSOL", async () => {
     const unique_id2 = new BN(Date.now());
@@ -440,17 +435,14 @@ describe("elara/fill_order", () => {
             c: validityProof1.c,
           },
         },
-        accountMeta: {
-          address: compressed_account.address,
-          treeInfo: {
-            rootIndex: proof1.rootIndices[0],
-            merkleTreePubkeyIndex: 0,
-            queuePubkeyIndex: 1,
-            proveByIndex: false,
-            leafIndex: compressed_account.leafIndex,
-          },
-          outputStateTreeIndex: 0,
+        treeInfo: {
+          rootIndex: proof1.rootIndices[0],
+          merkleTreePubkeyIndex: 0,
+          queuePubkeyIndex: 1,
+          proveByIndex: false,
+          leafIndex: compressed_account.leafIndex,
         },
+        outputStateTreeIndex: 0,
       })
       .accounts({
         payer: payer.publicKey,

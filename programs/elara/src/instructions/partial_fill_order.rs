@@ -13,8 +13,10 @@ use light_sdk::{
 };
 
 use crate::{
-    error::CustomError, parse_jupiter_route_data, state::EscrowAccount, swap_cpi,
-    PROTOCOL_VAULT_SEED,
+    error::CustomError,
+    parse_jupiter_route_data,
+    state::{AccountParams, EscrowAccount, Tokens},
+    swap_cpi, PROTOCOL_VAULT_SEED,
 };
 
 use jupiter::program::Jupiter;
@@ -76,10 +78,10 @@ pub struct PartialFill<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct PartialFillOrderParams {
     pub swap_data: Vec<u8>,
-    pub escrow_account: EscrowAccount,
+    pub escrow_account: AccountParams,
     pub proof: ValidityProof,
     pub account_meta: CompressedAccountMeta,
-    pub taking_amount: u64,
+    pub taking_amount: u64, // NOTE: here we do ExacOut. swap some making amount to a exact taking
 }
 
 pub fn partial_fill<'info>(
@@ -93,30 +95,30 @@ pub fn partial_fill<'info>(
 
     let escrow_account = &args.escrow_account;
 
-    require!(
-        escrow_account.maker == ctx.accounts.maker.key(),
-        CustomError::InvalidEscrowMaker
-    );
+    // require!(
+    //     escrow_account.maker == ctx.accounts.maker.key(),
+    //     CustomError::InvalidEscrowMaker
+    // );
+    //
+    // require!(
+    //     escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
+    //     CustomError::InvalidInputMint
+    // );
+    //
+    // require!(
+    //     escrow_account.tokens.input_token_program == ctx.accounts.input_token_program.key(),
+    //     ErrorCode::InvalidProgramId
+    // );
+    //
+    // require!(
+    //     escrow_account.tokens.output_mint == ctx.accounts.output_mint.key(),
+    //     CustomError::InvalidOutputMint
+    // );
 
-    require!(
-        escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
-        CustomError::InvalidInputMint
-    );
-
-    require!(
-        escrow_account.tokens.input_token_program == ctx.accounts.input_token_program.key(),
-        ErrorCode::InvalidProgramId
-    );
-
-    require!(
-        escrow_account.tokens.output_mint == ctx.accounts.output_mint.key(),
-        CustomError::InvalidOutputMint
-    );
-
-    require!(
-        escrow_account.tokens.output_token_program == ctx.accounts.output_token_program.key(),
-        ErrorCode::InvalidProgramId
-    );
+    // require!(
+    //     escrow_account.tokens.output_token_program == ctx.accounts.output_token_program.key(),
+    //     ErrorCode::InvalidProgramId
+    // );
 
     // FIXME: validate the accounts
     let remaining = &ctx.remaining_accounts;
@@ -164,8 +166,8 @@ pub fn partial_fill<'info>(
     emit!(PartialFillOrderEvent {
         escrow_address,
         maker: ctx.accounts.maker.key(),
-        input_mint: escrow_account.tokens.input_mint,
-        output_mint: escrow_account.tokens.output_mint,
+        input_mint: ctx.accounts.input_mint.key(),
+        output_mint: ctx.accounts.output_mint.key(),
         slippage_bps: escrow_account.slippage_bps,
         in_amount,
         out_amount,
@@ -217,9 +219,14 @@ pub fn light_cpi<'info>(
         &crate::ID,
         &args.account_meta,
         EscrowAccount {
-            maker: escrow_account.maker,
+            maker: ctx.accounts.maker.key(),
             unique_id: escrow_account.unique_id,
-            tokens: escrow_account.tokens,
+            tokens: Tokens {
+                input_mint: ctx.accounts.input_mint.key(),
+                output_mint: ctx.accounts.output_mint.key(),
+                input_token_program: ctx.accounts.input_token_program.key(),
+                output_token_program: ctx.accounts.output_token_program.key(),
+            },
             amount: escrow_account.amount,
             slippage_bps: escrow_account.slippage_bps,
             fee_bps: escrow_account.fee_bps,

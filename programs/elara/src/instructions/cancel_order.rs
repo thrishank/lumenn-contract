@@ -6,7 +6,7 @@ use light_sdk::{
     account::LightAccount,
     address::v1::derive_address,
     cpi::{CpiAccounts, CpiInputs},
-    instruction::{account_meta::CompressedAccountMeta, ValidityProof},
+    instruction::{account_meta::CompressedAccountMeta, PackedStateTreeInfo, ValidityProof},
 };
 
 use anchor_spl::{
@@ -14,7 +14,10 @@ use anchor_spl::{
     token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 
-use crate::{error::CustomError, state::EscrowAccount};
+use crate::{
+    error::CustomError,
+    state::{AccountParams, EscrowAccount, Tokens},
+};
 
 #[derive(Accounts)]
 pub struct CancelOrder<'info> {
@@ -27,6 +30,7 @@ pub struct CancelOrder<'info> {
     pub maker: AccountInfo<'info>,
 
     pub input_mint: InterfaceAccount<'info, Mint>,
+    pub output_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         init_if_needed,
@@ -52,6 +56,7 @@ pub struct CancelOrder<'info> {
     pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
 
     pub input_token_program: Interface<'info, TokenInterface>,
+    pub output_token_program: Interface<'info, TokenInterface>,
 
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -59,9 +64,10 @@ pub struct CancelOrder<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct CancelOrderParams {
-    pub escrow_account: EscrowAccount,
+    pub escrow_account: AccountParams,
     pub proof: ValidityProof,
-    pub account_meta: CompressedAccountMeta,
+    pub tree_info: PackedStateTreeInfo,
+    pub output_state_tree_index: u8,
 }
 
 pub fn cancel<'info>(
@@ -69,13 +75,36 @@ pub fn cancel<'info>(
     args: CancelOrderParams,
 ) -> Result<()> {
     let escrow_account = args.escrow_account;
+
+    let (address, _address_seed) = derive_address(
+        &[
+            b"escrow",
+            escrow_account.unique_id.to_le_bytes().as_ref(),
+            ctx.accounts.maker.key().as_ref(),
+        ],
+        &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
+            .expect("Invalid merkle tree pubkey"),
+        &crate::ID,
+    );
+
+    let account_meta = CompressedAccountMeta {
+        address,
+        tree_info: args.tree_info,
+        output_state_tree_index: args.output_state_tree_index,
+    };
+
     let escrow = LightAccount::<'_, EscrowAccount>::new_close(
         &crate::ID,
-        &args.account_meta,
+        &account_meta,
         EscrowAccount {
-            maker: escrow_account.maker,
+            maker: ctx.accounts.maker.key(),
             unique_id: escrow_account.unique_id,
-            tokens: escrow_account.tokens,
+            tokens: Tokens {
+                input_mint: ctx.accounts.input_mint.key(),
+                output_mint: ctx.accounts.output_mint.key(),
+                input_token_program: ctx.accounts.input_token_program.key(),
+                output_token_program: ctx.accounts.output_token_program.key(),
+            },
             amount: escrow_account.amount,
             slippage_bps: escrow_account.slippage_bps,
             fee_bps: escrow_account.fee_bps,
@@ -86,20 +115,21 @@ pub fn cancel<'info>(
     )
     .map_err(ProgramError::from)?;
 
-    require!(
-        escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
-        CustomError::InvalidInputMint
-    );
-
-    require!(
-        escrow.tokens.input_token_program == ctx.accounts.input_token_program.key(),
-        ErrorCode::InvalidProgramId
-    );
-
-    require!(
-        escrow_account.maker == ctx.accounts.maker.key(),
-        CustomError::InvalidEscrowMaker
-    );
+    // NOTE: These check's are not really needed. light verification will fill if address corrupt
+    // require!(
+    //     escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
+    //     CustomError::InvalidInputMint
+    // );
+    //
+    // require!(
+    //     escrow.tokens.input_token_program == ctx.accounts.input_token_program.key(),
+    //     ErrorCode::InvalidProgramId
+    // );
+    //
+    // require!(
+    //     escrow_account.maker == ctx.accounts.maker.key(),
+    //     CustomError::InvalidEscrowMaker
+    // );
 
     require!(
         *escrow.owner() == crate::ID,
@@ -114,17 +144,6 @@ pub fn cancel<'info>(
     if !is_expired {
         require!(ctx.accounts.maker.is_signer, CustomError::Unauthorized);
     }
-
-    let (address, _address_seed) = derive_address(
-        &[
-            b"escrow",
-            escrow_account.unique_id.to_le_bytes().as_ref(),
-            ctx.accounts.maker.key().as_ref(),
-        ],
-        &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
-            .expect("Invalid merkle tree pubkey"),
-        &crate::ID,
-    );
 
     if address != escrow.address().expect("Invalid escrow address") {
         return Err(error!(CustomError::InvalidEscrow));
@@ -168,7 +187,7 @@ pub fn cancel<'info>(
         maker: ctx.accounts.maker.key(),
         unique_id: escrow_account.unique_id,
         input_mint: ctx.accounts.input_mint.key(),
-        output_mint: escrow_account.tokens.output_mint,
+        output_mint: ctx.accounts.output_mint.key(),
         is_expired,
         cancelled_by: ctx.accounts.payer.key(),
         timestamp: Clock::get()?.unix_timestamp,

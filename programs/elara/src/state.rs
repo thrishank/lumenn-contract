@@ -40,3 +40,14 @@ pub struct Amount {
     pub making_amount: u64,
     pub taking_amount: u64,
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Copy)]
+pub struct AccountParams {
+    pub unique_id: u64,
+    pub amount: Amount,
+    pub slippage_bps: u16,
+    pub fee_bps: u16,
+    pub expired_at: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}

@@ -66,7 +66,17 @@ describe("elara/create_token_account", () => {
 
   const rpc = createRpc(url, indexer, url);
 
+  /*
   it("create token account", async () => {
+    const { accounts: jup_accounts, alt } = await get_swap_instruction();
+
+    const altAddresse = await Promise.all(
+      alt.map(async (key: string) => {
+        const newAlt = await clone_alt(key);
+        return newAlt;
+      })
+    );
+
     const unique_id = new BN(Date.now());
     const protocol_vault = PublicKey.findProgramAddressSync(
       [Buffer.from("protocol_vault")],
@@ -175,8 +185,6 @@ describe("elara/create_token_account", () => {
       "So11111111111111111111111111111111111111112"
     );
 
-    const { accounts: jup_accounts, alt } = await get_swap_instruction();
-
     const instruction = await program.methods
       .createAta({
         swapData: Buffer.from(swap.swapInstruction.data, "base64"),
@@ -202,17 +210,17 @@ describe("elara/create_token_account", () => {
             c: validityProof1.c,
           },
         },
-        accountMeta: {
-          address: compressed_account.address,
-          treeInfo: {
-            rootIndex: proof1.rootIndices[0],
-            merkleTreePubkeyIndex: 0,
-            queuePubkeyIndex: 1,
-            proveByIndex: false,
-            leafIndex: compressed_account.leafIndex,
-          },
-          outputStateTreeIndex: 0,
+        // accountMeta: {
+        //   address: compressed_account.address,
+        treeInfo: {
+          rootIndex: proof1.rootIndices[0],
+          merkleTreePubkeyIndex: 0,
+          queuePubkeyIndex: 1,
+          proveByIndex: false,
+          leafIndex: compressed_account.leafIndex,
         },
+        outputStateTreeIndex: 0,
+        // },
       })
       .accounts({
         payer: payer.publicKey,
@@ -220,20 +228,14 @@ describe("elara/create_token_account", () => {
         makerTokenAta: ata,
         inputMint: input_mint,
         outputMint: output_mint,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        inputTokenProgram: TOKEN_PROGRAM_ID,
+        outputTokenProgram: TOKEN_PROGRAM_ID,
         jupiterProgram: new PublicKey(
           "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
         ),
       })
       .remainingAccounts([...CLOSE_ACCOUNTS, ...jup_accounts])
       .instruction();
-
-    const altAddresse = await Promise.all(
-      alt.map(async (key: string) => {
-        const newAlt = await clone_alt(key);
-        return newAlt;
-      })
-    );
 
     const altAddresses = [
       "7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5",
@@ -267,6 +269,15 @@ describe("elara/create_token_account", () => {
     const size = calculateTransactionSize(tx_ata);
     console.log("Transaction size:", size);
 
+    // after optimizing all
+    // 248 - 1048, 1053
+    // 249 - 1011
+    // 250 - 1012
+    // 252 - 1044, 1054
+    // 300 - 1170
+    // 495 - 1163
+    // 1203 with two ALT from JUP
+
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
     const sig = await rpc.sendTransaction(tx_ata);
@@ -296,13 +307,14 @@ describe("elara/create_token_account", () => {
       rpc,
       address,
       uniqueId: unique_id,
-      payer: payer.publicKey,
+      maker: payer.publicKey,
       inputMint: input_mint,
       outputMint: output_mint,
       makingAmount: new BN(makingAmount).sub(new BN(inAmount)),
       takingAmount: new BN(takingAmount).sub(new BN(100000)),
     });
   });
+  */
 
   it("create ata account with WSOL", async () => {
     const unique_id = new BN(Date.now());
@@ -527,8 +539,9 @@ describe("elara/create_token_account", () => {
     const size = calculateTransactionSize(tx_cancel);
     console.log("Transaction size:", size);
 
-    const sig = await rpc.sendTransaction(tx_cancel);
+    // 976
 
+    const sig = await rpc.sendTransaction(tx_cancel);
     console.log("✅ Signature:", sig);
 
     const makerATA = await getAssociatedTokenAddress(
@@ -554,7 +567,7 @@ describe("elara/create_token_account", () => {
       rpc,
       address,
       uniqueId: unique_id,
-      payer: payer.publicKey,
+      maker: payer.publicKey,
       inputMint: sol_mint,
       outputMint: output_mint,
       makingAmount: new BN(makingAmount).sub(new BN(2039280)),

@@ -28,11 +28,11 @@ type Escrow = {
     makingAmount: BN;
     takingAmount: BN;
   };
-  slippageBps: number;
-  feeBps: BN;
   expiredAt: BN;
   createdAt: BN;
   updatedAt: BN;
+  slippageBps: number;
+  feeBps: number;
 };
 
 export function parseEscrowFromBuffer(buffer: Buffer): Escrow {
@@ -75,7 +75,7 @@ export function parseEscrowFromBuffer(buffer: Buffer): Escrow {
       takingAmount: new BN(taking_amount.toString()),
     },
     slippageBps: Number(slippage_bps),
-    feeBps: new BN(fee_bps.toString()),
+    feeBps: Number(fee_bps),
     expiredAt: new BN(expired_at.toString()),
     createdAt: new BN(created_at.toString()),
     updatedAt: new BN(updated_at.toString()),
