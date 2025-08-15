@@ -189,6 +189,11 @@ fn light_cpi<'info>(
         ErrorCode::AccountOwnedByWrongProgram
     );
 
+    require!(
+        address == escrow.address().expect("invalid escrow address"),
+        CustomError::InvalidEscrow
+    );
+
     escrow.amount.making_amount = escrow
         .amount
         .making_amount

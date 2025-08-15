@@ -253,9 +253,11 @@ fn light_cpi_close<'info>(
         *escrow.owner() == crate::ID,
         ErrorCode::AccountOwnedByWrongProgram
     );
-    if address != escrow.address().expect("Invalid escrow address") {
-        return Err(error!(CustomError::InvalidEscrow));
-    }
+
+    require!(
+        address == escrow.address().expect("invalid escrow address"),
+        CustomError::InvalidEscrow
+    );
 
     let cpi_accounts = light_sdk::cpi::CpiAccounts::new(
         ctx.accounts.payer.as_ref(),

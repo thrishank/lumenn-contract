@@ -9,7 +9,7 @@ use anchor_spl::{
 use light_sdk::{
     account::LightAccount,
     address::v1::derive_address,
-    instruction::{account_meta::CompressedAccountMeta, ValidityProof},
+    instruction::{account_meta::CompressedAccountMeta, PackedStateTreeInfo, ValidityProof},
 };
 
 use crate::{
@@ -80,8 +80,10 @@ pub struct PartialFillOrderParams {
     pub swap_data: Vec<u8>,
     pub escrow_account: AccountParams,
     pub proof: ValidityProof,
-    pub account_meta: CompressedAccountMeta,
-    pub taking_amount: u64, // NOTE: here we do ExacOut. swap some making amount to a exact taking
+    // pub account_meta: CompressedAccountMeta,
+    // pub taking_amount: u64, // NOTE: here we do ExacOut. swap some making amount to a exact taking
+    pub tree_info: PackedStateTreeInfo,
+    pub output_state_tree_index: u8,
 }
 
 pub fn partial_fill<'info>(
@@ -141,9 +143,9 @@ pub fn partial_fill<'info>(
 
     let escrow_account = args.escrow_account;
 
-    if out_amount != args.taking_amount {
-        return Err(error!(CustomError::InvalidOutAmount));
-    }
+    // if out_amount != args.taking_amount {
+    //     return Err(error!(CustomError::InvalidOutAmount));
+    // }
 
     if in_amount < escrow_account.amount.making_amount {
         return Err(ProgramError::InsufficientFunds.into());
@@ -215,9 +217,26 @@ pub fn light_cpi<'info>(
 ) -> Result<Pubkey> {
     let escrow_account = args.escrow_account;
 
+    let (address, _address_seed) = derive_address(
+        &[
+            b"escrow",
+            escrow_account.unique_id.to_le_bytes().as_ref(),
+            ctx.accounts.maker.key().as_ref(),
+        ],
+        &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
+            .expect("Invalid merkle tree pubkey"),
+        &crate::ID,
+    );
+
+    let account_meta = CompressedAccountMeta {
+        address,
+        tree_info: args.tree_info,
+        output_state_tree_index: args.output_state_tree_index,
+    };
+
     let mut escrow = LightAccount::<'_, EscrowAccount>::new_mut(
         &crate::ID,
-        &args.account_meta,
+        &account_meta,
         EscrowAccount {
             maker: ctx.accounts.maker.key(),
             unique_id: escrow_account.unique_id,
@@ -242,20 +261,10 @@ pub fn light_cpi<'info>(
         ErrorCode::AccountOwnedByWrongProgram
     );
 
-    let (address, _address_seed) = derive_address(
-        &[
-            b"escrow",
-            escrow_account.unique_id.to_le_bytes().as_ref(),
-            ctx.accounts.maker.key().as_ref(),
-        ],
-        &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
-            .expect("Invalid merkle tree pubkey"),
-        &crate::ID,
+    require!(
+        address == escrow.address().expect("invalid escrow address"),
+        CustomError::InvalidEscrow
     );
-
-    if address != escrow.address().expect("Invalid escrow address") {
-        return Err(error!(CustomError::InvalidEscrow));
-    }
 
     escrow.amount.making_amount = escrow
         .amount
