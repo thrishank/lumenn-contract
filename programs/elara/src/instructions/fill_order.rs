@@ -13,13 +13,14 @@ use light_sdk::{
 
 use crate::{
     error::CustomError,
-    jupiter::types::RoutePlanStep,
     parse_jupiter_route_data,
     state::{AccountParams, EscrowAccount, Tokens},
-    swap_cpi, PROTOCOL_VAULT_SEED,
+    swap_cpi,
+    utils::validate_route,
+    PROTOCOL_VAULT_SEED,
 };
 
-use jupiter::program::Jupiter;
+use jupiter::{program::Jupiter, types::RoutePlanStep};
 
 declare_program!(jupiter);
 
@@ -147,6 +148,24 @@ pub fn fill<'info>(
     // hard coded 0.05%
     if jup_data.platform_fee_bps != 5 {
         return Err(error!(CustomError::InvalidPlatformFeeBps));
+    }
+
+    if jup_data.is_exact_out {
+        return Err(error!(CustomError::InvalidJupInstructionData));
+    }
+
+    if jup_data.route == JupiterRoutes::Route {
+        validate_route(
+            jupiter_accounts,
+            ctx.accounts.input_mint.key(),
+            ctx.accounts.output_mint.key(),
+            ctx.accounts.input_token_program.key(),
+            ctx.accounts.output_token_program.key(),
+        )?;
+    }
+
+    if jup_data.route == JupiterRoutes::SharedAccountsRoute {
+        // validate_shared_accounts_route
     }
 
     // swap_cpi(
@@ -328,4 +347,12 @@ pub struct SharedAccountsExactOutRoute {
     pub quoted_in_amount: u64,
     pub slippage_bps: u16,
     pub platform_fee_bps: u8,
+}
+
+#[derive(AnchorDeserialize, Debug, PartialEq, Eq, Clone)]
+pub enum JupiterRoutes {
+    Route,
+    SharedAccountsRoute,
+    ExactOutRoute,
+    SharedAccountsExactOutRoute,
 }

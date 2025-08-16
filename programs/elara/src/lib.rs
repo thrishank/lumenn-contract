@@ -13,6 +13,7 @@ pub mod constants;
 pub mod error;
 pub mod instructions;
 pub mod state;
+pub mod utils;
 
 pub use constants::*;
 use instructions::*;
@@ -55,6 +56,10 @@ pub mod elara {
         create_token_account::create_token_account(ctx, args)
     }
 
+    // if the making tokens is WSOL then no need to swap
+    // take small amount from it and send it payer
+    // payer create the output ATA.
+    // update's the amount state. sub both making and taking amount
     #[instruction(discriminator = [1])]
     pub fn create_ata_wsol<'info>(
         ctx: Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
@@ -74,7 +79,6 @@ pub mod elara {
         args: FillOrderParams,
     ) -> Result<()> {
         fill_order::fill(ctx, args)
-        //TODO: decrease the transaction size
     }
 
     // partial fill the order when the price reaches the user target
@@ -109,6 +113,12 @@ pub fn swap_cpi<'info>(
 
     let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[PROTOCOL_VAULT_BUMP]]];
 
+    require_keys_eq!(
+        jupiter_program.key(),
+        JUPITER_V6_PROGRAM_ID,
+        CustomError::InvalidAccount
+    );
+
     invoke_signed(
         &Instruction {
             program_id: jupiter_program.key(),
@@ -123,15 +133,16 @@ pub fn swap_cpi<'info>(
 }
 
 #[derive(Debug)]
-pub struct RouteAmounts {
+pub struct RouteData {
     pub in_amount: u64,
     pub out_amount: u64,
     pub slippage_bps: u16,
     pub platform_fee_bps: u8,
     pub is_exact_out: bool,
+    pub route: JupiterRoutes,
 }
 
-pub fn parse_jupiter_route_data(data: &[u8]) -> Result<RouteAmounts> {
+pub fn parse_jupiter_route_data(data: &[u8]) -> Result<RouteData> {
     if data.len() < 8 {
         return Err(error!(CustomError::InvalidJupInstructionData));
     }
@@ -141,39 +152,43 @@ pub fn parse_jupiter_route_data(data: &[u8]) -> Result<RouteAmounts> {
 
     if discriminator == discriminators::EXACT_OUT_ROUTE {
         let route_data = ExactOutRoute::deserialize(&mut input_data)?;
-        Ok(RouteAmounts {
+        Ok(RouteData {
             in_amount: route_data.quoted_in_amount,
             out_amount: route_data.out_amount,
             slippage_bps: route_data.slippage_bps,
             platform_fee_bps: route_data.platform_fee_bps,
             is_exact_out: true,
+            route: JupiterRoutes::ExactOutRoute,
         })
     } else if discriminator == discriminators::SHARED_ACCOUNTS_EXACT_OUT_ROUTE {
         let route_data = SharedAccountsExactOutRoute::deserialize(&mut input_data)?;
-        Ok(RouteAmounts {
+        Ok(RouteData {
             in_amount: route_data.quoted_in_amount,
             out_amount: route_data.out_amount,
             slippage_bps: route_data.slippage_bps,
             platform_fee_bps: route_data.platform_fee_bps,
             is_exact_out: true,
+            route: JupiterRoutes::SharedAccountsExactOutRoute,
         })
     } else if discriminator == discriminators::ROUTE {
         let route_data = Route::deserialize(&mut input_data)?;
-        Ok(RouteAmounts {
+        Ok(RouteData {
             in_amount: route_data.in_amount,
             out_amount: route_data.quoted_out_amount,
             slippage_bps: route_data.slippage_bps,
             platform_fee_bps: route_data.platform_fee_bps,
             is_exact_out: false,
+            route: JupiterRoutes::Route,
         })
     } else if discriminator == discriminators::SHARED_ACCOUNTS_ROUTE {
         let route_data = SharedAccountsRoute::deserialize(&mut input_data)?;
-        Ok(RouteAmounts {
+        Ok(RouteData {
             in_amount: route_data.in_amount,
             out_amount: route_data.quoted_out_amount,
             slippage_bps: route_data.slippage_bps,
             platform_fee_bps: route_data.platform_fee_bps,
             is_exact_out: false,
+            route: JupiterRoutes::SharedAccountsRoute,
         })
     } else {
         Err(error!(CustomError::InvalidJupInstructionData))

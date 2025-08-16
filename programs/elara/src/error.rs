@@ -50,4 +50,10 @@ pub enum CustomError {
     InvalidPlatformFeeBps,
     #[msg("Invalid instruction to create ata when the making token is SOL call create_ata_wsol instruction")]
     InvalidCreateAtaInstruction,
+    #[msg("InvalidTokenProgramId")]
+    InvalidTokenProgramId,
+    #[msg("Invalid Account")]
+    InvalidAccount,
+    #[msg("Account not writable")]
+    NotWritable,
 }
