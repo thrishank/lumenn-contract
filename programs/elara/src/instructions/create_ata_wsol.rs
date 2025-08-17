@@ -8,7 +8,12 @@ use light_sdk::{
     instruction::{account_meta::CompressedAccountMeta, ValidityProof},
 };
 
-use crate::{error::CustomError, state::EscrowAccount, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED};
+use crate::{
+    error::CustomError,
+    state::EscrowAccount,
+    utils::{expected_accounts, validate_light_accounts, LightAccountSet},
+    LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
+};
 use crate::{parse_jupiter_route_data, SOL_MINT};
 
 #[derive(Accounts)]
@@ -140,6 +145,11 @@ fn light_cpi<'info>(
         .taking_amount
         .checked_sub(amount_swapped)
         .ok_or(ProgramError::ArithmeticOverflow)?;
+
+    validate_light_accounts(
+        ctx.remaining_accounts,
+        &expected_accounts(LightAccountSet::Update),
+    )?;
 
     let cpi_accounts = light_sdk::cpi::CpiAccounts::new(
         ctx.accounts.payer.as_ref(),

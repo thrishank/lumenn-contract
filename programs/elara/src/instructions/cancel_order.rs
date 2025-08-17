@@ -17,6 +17,7 @@ use anchor_spl::{
 use crate::{
     error::CustomError,
     state::{AccountParams, EscrowAccount, Tokens},
+    utils::{expected_accounts, validate_light_accounts, LightAccountSet},
 };
 
 #[derive(Accounts)]
@@ -148,6 +149,11 @@ pub fn cancel<'info>(
     if address != escrow.address().expect("Invalid escrow address") {
         return Err(error!(CustomError::InvalidEscrow));
     }
+
+    validate_light_accounts(
+        ctx.remaining_accounts,
+        &expected_accounts(LightAccountSet::Close),
+    )?;
 
     let light_cpi_accounts = CpiAccounts::new(
         ctx.accounts.payer.as_ref(),

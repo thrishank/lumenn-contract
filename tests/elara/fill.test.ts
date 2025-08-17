@@ -306,7 +306,6 @@ describe("elara/fill_order", () => {
     await assertEscrowDoesNotExist({ rpc, address });
   });
 
-  /*
   it("fill order WSOL", async () => {
     const unique_id2 = new BN(Date.now());
 
@@ -531,5 +530,4 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
-  */
 });

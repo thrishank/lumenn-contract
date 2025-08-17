@@ -56,4 +56,6 @@ pub enum CustomError {
     InvalidAccount,
     #[msg("Account not writable")]
     NotWritable,
+    #[msg("Invalid number of Accounts")]
+    InvalidNumberOfAccounts,
 }

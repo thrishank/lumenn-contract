@@ -18,7 +18,9 @@ use jupiter::program::Jupiter;
 declare_program!(jupiter);
 
 use crate::state::{AccountParams, Tokens};
-use crate::utils::validate_jupiter_accounts;
+use crate::utils::{
+    expected_accounts, validate_jupiter_accounts, validate_light_accounts, LightAccountSet,
+};
 use crate::{
     error::CustomError, state::EscrowAccount, swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
@@ -92,6 +94,8 @@ pub fn create_token_account<'info>(
 
     let remaining = &ctx.remaining_accounts;
     let light_accounts = &remaining[0..10];
+
+    validate_light_accounts(light_accounts, &expected_accounts(LightAccountSet::Update))?;
 
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 

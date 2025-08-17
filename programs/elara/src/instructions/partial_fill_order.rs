@@ -17,7 +17,9 @@ use crate::{
     parse_jupiter_route_data,
     state::{AccountParams, EscrowAccount, Tokens},
     swap_cpi,
-    utils::validate_jupiter_accounts,
+    utils::{
+        expected_accounts, validate_jupiter_accounts, validate_light_accounts, LightAccountSet,
+    },
     PROTOCOL_VAULT_SEED,
 };
 
@@ -91,6 +93,8 @@ pub fn partial_fill<'info>(
 
     let remaining = &ctx.remaining_accounts;
     let light_accounts = &remaining[0..10];
+
+    validate_light_accounts(light_accounts, &expected_accounts(LightAccountSet::Update))?;
 
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 

@@ -11,7 +11,11 @@ use light_sdk::{
     instruction::{PackedAddressTreeInfo, ValidityProof},
 };
 
-use crate::{error::CustomError, state::EscrowAccount};
+use crate::{
+    error::CustomError,
+    state::EscrowAccount,
+    utils::{expected_accounts, validate_light_accounts, LightAccountSet},
+};
 
 #[derive(Accounts)]
 pub struct InitializeOrder<'info> {
@@ -91,6 +95,11 @@ pub fn init<'info>(
             CustomError::InvalidExpiration
         );
     }
+
+    validate_light_accounts(
+        ctx.remaining_accounts,
+        &expected_accounts(LightAccountSet::Init),
+    )?;
 
     let light_cpi_accounts = CpiAccounts::new(
         ctx.accounts.payer.as_ref(),

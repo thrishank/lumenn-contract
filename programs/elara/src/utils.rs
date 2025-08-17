@@ -312,3 +312,70 @@ fn validate_shared_accounts_route(
 
     Ok(())
 }
+
+pub const STATE_TREE: Pubkey = pubkey!("smt6ukQDSPPYHSshQovmiRUjG9jGFq2hW9vgrDFk5Yz");
+pub const STATE_QUEUE: Pubkey = pubkey!("nfq6uzaNZ5n3EWF4t64M93AWzLGt5dXTikEA9fFRktv");
+pub const ADDRESS_TREE: Pubkey = pubkey!("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2");
+pub const ADDRESS_QUEUE: Pubkey = pubkey!("aq1S9z4reTSQAdgWHGD2zDaS39sjGrAxbR31vxJ2F4F");
+pub const COMPRESSION_PROGRAM: Pubkey = pubkey!("compr6CUsB5m2jS4Y3831ztGSTnDpnKJTKS95d64XVq");
+pub const REGISTERED_PROGRAM_PDA: Pubkey = pubkey!("35hkDgaAKwMCaxRz2ocSZ6NaUrtKkyNqU6c4RV3tYJRh");
+pub const ACCOUNT_COMPRESSION_AUTHORITY: Pubkey =
+    pubkey!("HwXnGK3tPkkVY6P439H2p68AxpeuWXd5PcrAxFpbmfbA");
+pub const NOOP_PROGRAM: Pubkey = pubkey!("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+pub const SYSTEM_PROGRAM_ID: Pubkey = pubkey!("11111111111111111111111111111111");
+pub const LIGHT_SYSTEM_PROGRAM: Pubkey = pubkey!("SySTEM1eSU2p4BGQfQpimFEWWSC1XDFeun3Nqzz3rT7");
+// TODO: Change this as program id changes
+pub const CPI_AUTHORITY: Pubkey = pubkey!("6t6j75BtqzzTfgR6ebW8wR7m82gRzJQiLK4TqN7gKTKs");
+
+pub enum LightAccountSet {
+    Init,
+    Update,
+    Close,
+}
+
+fn base_accounts() -> Vec<AccountMeta> {
+    vec![
+        AccountMeta::new_readonly(LIGHT_SYSTEM_PROGRAM, false),
+        AccountMeta::new_readonly(CPI_AUTHORITY, false),
+        AccountMeta::new_readonly(REGISTERED_PROGRAM_PDA, false),
+        AccountMeta::new_readonly(NOOP_PROGRAM, false),
+        AccountMeta::new_readonly(ACCOUNT_COMPRESSION_AUTHORITY, false),
+        AccountMeta::new_readonly(COMPRESSION_PROGRAM, false),
+        AccountMeta::new_readonly(crate::ID, false),
+        AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
+    ]
+}
+
+pub fn expected_accounts(set: LightAccountSet) -> Vec<AccountMeta> {
+    let mut accounts = base_accounts();
+    match set {
+        LightAccountSet::Init => {
+            accounts.push(AccountMeta::new(ADDRESS_TREE, false));
+            accounts.push(AccountMeta::new(STATE_TREE, false));
+            accounts.push(AccountMeta::new(ADDRESS_QUEUE, false));
+        }
+        LightAccountSet::Update | LightAccountSet::Close => {
+            accounts.push(AccountMeta::new(STATE_TREE, false));
+            accounts.push(AccountMeta::new(STATE_QUEUE, false));
+        }
+    }
+
+    accounts
+}
+
+pub fn validate_light_accounts(remaining: &[AccountInfo], expected: &[AccountMeta]) -> Result<()> {
+    require_eq!(
+        remaining.len(),
+        expected.len(),
+        CustomError::InvalidNumberOfAccounts
+    );
+
+    for (acc, exp) in remaining.iter().zip(expected.iter()) {
+        require_keys_eq!(acc.key(), exp.pubkey, CustomError::InvalidAccount);
+
+        // writable flag
+        require!(acc.is_writable == exp.is_writable, CustomError::NotWritable);
+    }
+
+    Ok(())
+}

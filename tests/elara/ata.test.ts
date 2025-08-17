@@ -314,7 +314,6 @@ describe("elara/create_token_account", () => {
     });
   });
 
-  /*
   it("create ata account with WSOL", async () => {
     const unique_id = new BN(Date.now());
 
@@ -551,7 +550,7 @@ describe("elara/create_token_account", () => {
     let makerAccountExists = false;
 
     try {
-      await getAccount(program.provider.connection, makerATA);
+      await getAccount(program.provider.connection, makerATA, "processed");
       makerAccountExists = true;
     } catch (err) {
       makerAccountExists = false;
@@ -573,5 +572,4 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(inAmount)),
     });
   });
-  */
 });
