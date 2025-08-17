@@ -6,9 +6,10 @@ export async function get_swap(
   input_mint: string,
   output_mint: string,
   amount = 2039280,
-  swapMode = "ExactOut"
+  swapMode = "ExactOut",
+  platformFeeBps = 0
 ) {
-  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=${input_mint}&outputMint=${output_mint}&amount=${amount}&swapMode=${swapMode}&platformFeeBps=0`;
+  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=${input_mint}&outputMint=${output_mint}&amount=${amount}&swapMode=${swapMode}&platformFeeBps=${platformFeeBps}`;
   const quote = await axios.get(quote_url);
   console.log("quote in amount", quote.data.inAmount);
   console.log("quote out amount", quote.data.outAmount);
@@ -46,7 +47,7 @@ export async function get_swap_instruction() {
       Accept: "application/json",
     },
     data: JSON.stringify({
-      userPublicKey: "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
+      userPublicKey: "HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd",
       quoteResponse: quote.data,
     }),
   };

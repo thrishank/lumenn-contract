@@ -16,7 +16,9 @@ use crate::{
     error::CustomError,
     parse_jupiter_route_data,
     state::{AccountParams, EscrowAccount, Tokens},
-    swap_cpi, PROTOCOL_VAULT_SEED,
+    swap_cpi,
+    utils::validate_jupiter_accounts,
+    PROTOCOL_VAULT_SEED,
 };
 
 use jupiter::program::Jupiter;
@@ -49,14 +51,6 @@ pub struct PartialFill<'info> {
         bump
     )]
     pub protocol_vault: SystemAccount<'info>,
-
-    #[account(
-        mut,
-        associated_token::mint = input_mint,
-        associated_token::authority = protocol_vault,
-        associated_token::token_program = input_token_program
-    )]
-    pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         init_if_needed,
@@ -95,37 +89,8 @@ pub fn partial_fill<'info>(
         CustomError::InvalidJupInstructionData
     );
 
-    let escrow_account = &args.escrow_account;
-
-    // require!(
-    //     escrow_account.maker == ctx.accounts.maker.key(),
-    //     CustomError::InvalidEscrowMaker
-    // );
-    //
-    // require!(
-    //     escrow_account.tokens.input_mint == ctx.accounts.input_mint.key(),
-    //     CustomError::InvalidInputMint
-    // );
-    //
-    // require!(
-    //     escrow_account.tokens.input_token_program == ctx.accounts.input_token_program.key(),
-    //     ErrorCode::InvalidProgramId
-    // );
-    //
-    // require!(
-    //     escrow_account.tokens.output_mint == ctx.accounts.output_mint.key(),
-    //     CustomError::InvalidOutputMint
-    // );
-
-    // require!(
-    //     escrow_account.tokens.output_token_program == ctx.accounts.output_token_program.key(),
-    //     ErrorCode::InvalidProgramId
-    // );
-
-    // FIXME: validate the accounts
     let remaining = &ctx.remaining_accounts;
     let light_accounts = &remaining[0..10];
-    let jupiter_accounts = &remaining[10..];
 
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
@@ -155,12 +120,23 @@ pub fn partial_fill<'info>(
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
-    swap_cpi(
-        &args.swap_data,
-        jupiter_accounts,
-        &ctx.accounts.protocol_vault.to_account_info(),
-        &ctx.accounts.jupiter_program,
-    )?;
+    let jupiter_accounts = &remaining[10..];
+
+    // validate_jupiter_accounts(
+    //     &jup_data.route,
+    //     jupiter_accounts,
+    //     ctx.accounts.input_mint.key(),
+    //     ctx.accounts.output_mint.key(),
+    //     ctx.accounts.input_token_program.key(),
+    //     ctx.accounts.output_token_program.key(),
+    // )?;
+    //
+    // swap_cpi(
+    //     &args.swap_data,
+    //     jupiter_accounts,
+    //     &ctx.accounts.protocol_vault.to_account_info(),
+    //     &ctx.accounts.jupiter_program,
+    // )?;
 
     let escrow_address = light_cpi(&ctx, light_accounts, &args, in_amount, out_amount)?;
     transfer_tokens(&ctx, out_amount)?;

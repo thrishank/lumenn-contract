@@ -17,3 +17,7 @@ pub const JUPITER_V6_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3t
 
 #[constant]
 pub const JUPITER_EVENT_AUTHORITY: Pubkey = pubkey!("D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf");
+
+pub const DEFAULT_PLATFORM_FEE_BPS: u8 = 5;
+pub const ZERO_PLATFORM_FEE_BPS: u8 = 0;
+pub const ATA_CREATION_AMOUNT: u64 = 2039280;

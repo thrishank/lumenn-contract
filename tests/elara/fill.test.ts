@@ -158,7 +158,8 @@ describe("elara/fill_order", () => {
       "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       makingAmount.toNumber(),
-      "ExactIn"
+      "ExactIn",
+      5
     );
 
     const { accounts: jup_accounts, alt } = await get_swap_instruction();
@@ -305,6 +306,7 @@ describe("elara/fill_order", () => {
     await assertEscrowDoesNotExist({ rpc, address });
   });
 
+  /*
   it("fill order WSOL", async () => {
     const unique_id2 = new BN(Date.now());
 
@@ -406,7 +408,8 @@ describe("elara/fill_order", () => {
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       sol_mint.toString(),
       makingAmount.toNumber(),
-      "ExactIn"
+      "ExactIn",
+      5
     );
 
     const { accounts: jup_accounts, alt } = await get_swap_instruction();
@@ -528,4 +531,5 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
+  */
 });

@@ -195,13 +195,10 @@ pub fn parse_jupiter_route_data(data: &[u8]) -> Result<RouteData> {
     }
 }
 
-// Full discriminator constants for reference
+// JUPITER ROUTE discriminators
 pub mod discriminators {
     pub const EXACT_OUT_ROUTE: [u8; 8] = [208, 51, 239, 151, 123, 43, 237, 92];
-
     pub const ROUTE: [u8; 8] = [229, 23, 203, 151, 122, 227, 173, 42];
-
     pub const SHARED_ACCOUNTS_EXACT_OUT_ROUTE: [u8; 8] = [176, 209, 105, 168, 154, 125, 69, 62];
-
     pub const SHARED_ACCOUNTS_ROUTE: [u8; 8] = [193, 32, 155, 51, 65, 214, 156, 129];
 }

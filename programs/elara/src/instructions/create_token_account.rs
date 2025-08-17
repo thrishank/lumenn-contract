@@ -18,6 +18,7 @@ use jupiter::program::Jupiter;
 declare_program!(jupiter);
 
 use crate::state::{AccountParams, Tokens};
+use crate::utils::validate_jupiter_accounts;
 use crate::{
     error::CustomError, state::EscrowAccount, swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
@@ -91,7 +92,6 @@ pub fn create_token_account<'info>(
 
     let remaining = &ctx.remaining_accounts;
     let light_accounts = &remaining[0..10];
-    let jupiter_accounts = &remaining[10..];
 
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
@@ -112,18 +112,28 @@ pub fn create_token_account<'info>(
     }
 
     let is_making_sol = ctx.accounts.input_mint.key().to_string() == SOL_MINT;
+
     if is_making_sol {
         return Err(error!(CustomError::InvalidCreateAtaInstruction));
     }
 
-    /*
-    swap_cpi(
-        &args.swap_data,
-        jupiter_accounts,
-        &ctx.accounts.jupiter_program,
-        &ctx.accounts.protocol_vault.to_account_info(),
-    )?;
-    */
+    // let jupiter_accounts = &remaining[10..];
+    //
+    // validate_jupiter_accounts(
+    //     &jup_data.route,
+    //     jupiter_accounts,
+    //     ctx.accounts.input_mint.key(),
+    //     ctx.accounts.output_mint.key(),
+    //     ctx.accounts.input_token_program.key(),
+    //     ctx.accounts.output_token_program.key(),
+    // )?;
+    //
+    // swap_cpi(
+    //     &args.swap_data,
+    //     jupiter_accounts,
+    //     &ctx.accounts.jupiter_program,
+    //     &ctx.accounts.protocol_vault.to_account_info(),
+    // )?;
 
     light_cpi(
         &ctx,

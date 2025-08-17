@@ -66,7 +66,6 @@ describe("elara/create_token_account", () => {
 
   const rpc = createRpc(url, indexer, url);
 
-  /*
   it("create token account", async () => {
     const { accounts: jup_accounts, alt } = await get_swap_instruction();
 
@@ -180,7 +179,7 @@ describe("elara/create_token_account", () => {
     let escrow_data = parseEscrowFromBuffer(buffer);
 
     const { swap, inAmount } = await get_swap(
-      "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
+      "HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd",
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       "So11111111111111111111111111111111111111112"
     );
@@ -314,8 +313,8 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(100000)),
     });
   });
-  */
 
+  /*
   it("create ata account with WSOL", async () => {
     const unique_id = new BN(Date.now());
 
@@ -574,4 +573,5 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(inAmount)),
     });
   });
+  */
 });

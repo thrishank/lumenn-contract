@@ -16,7 +16,7 @@ use crate::{
     parse_jupiter_route_data,
     state::{AccountParams, EscrowAccount, Tokens},
     swap_cpi,
-    utils::validate_route,
+    utils::validate_jupiter_accounts,
     PROTOCOL_VAULT_SEED,
 };
 
@@ -51,13 +51,6 @@ pub struct FillOrder<'info> {
     )]
     pub protocol_vault: SystemAccount<'info>,
 
-    // #[account(
-    //     mut,
-    //     associated_token::mint = input_mint,
-    //     associated_token::authority = protocol_vault,
-    //     associated_token::token_program = input_token_program
-    // )]
-    // pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
     #[account(
         init_if_needed,
         payer = payer,
@@ -122,10 +115,8 @@ pub fn fill<'info>(
     //     ErrorCode::InvalidProgramId
     // );
 
-    // FIXME: validate this accounts
     let remaining = &ctx.remaining_accounts;
     let light_accounts = &remaining[0..10];
-    let jupiter_accounts = &remaining[10..];
 
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
@@ -154,19 +145,16 @@ pub fn fill<'info>(
         return Err(error!(CustomError::InvalidJupInstructionData));
     }
 
-    if jup_data.route == JupiterRoutes::Route {
-        validate_route(
-            jupiter_accounts,
-            ctx.accounts.input_mint.key(),
-            ctx.accounts.output_mint.key(),
-            ctx.accounts.input_token_program.key(),
-            ctx.accounts.output_token_program.key(),
-        )?;
-    }
+    let jupiter_accounts = &remaining[10..];
 
-    if jup_data.route == JupiterRoutes::SharedAccountsRoute {
-        // validate_shared_accounts_route
-    }
+    // validate_jupiter_accounts(
+    //     &jup_data.route,
+    //     jupiter_accounts,
+    //     ctx.accounts.input_mint.key(),
+    //     ctx.accounts.output_mint.key(),
+    //     ctx.accounts.input_token_program.key(),
+    //     ctx.accounts.output_token_program.key(),
+    // )?;
 
     // swap_cpi(
     //     &args.swap_data,
