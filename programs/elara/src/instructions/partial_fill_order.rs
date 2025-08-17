@@ -62,13 +62,14 @@ pub struct PartialFill<'info> {
         associated_token::token_program = output_token_program
     )]
     pub protocol_vault_output_mint_ata: InterfaceAccount<'info, TokenAccount>,
-
     pub input_token_program: Interface<'info, TokenInterface>,
     pub output_token_program: Interface<'info, TokenInterface>,
 
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    pub jupiter_program: Program<'info, Jupiter>,
+    // pub jupiter_program: Program<'info, Jupiter>,
+    /// CHECK: Jupiter program account testing
+    pub jupiter_program: UncheckedAccount<'info>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -116,7 +117,7 @@ pub fn partial_fill<'info>(
     //     return Err(error!(CustomError::InvalidOutAmount));
     // }
 
-    if in_amount < escrow_account.amount.making_amount {
+    if in_amount > escrow_account.amount.making_amount {
         return Err(ProgramError::InsufficientFunds.into());
     }
 
@@ -169,7 +170,7 @@ pub fn transfer_tokens<'info>(
             .to_account_info(),
         to: ctx.accounts.maker_output_mint_ata.to_account_info(),
         authority: ctx.accounts.protocol_vault.to_account_info(),
-        mint: ctx.accounts.input_mint.to_account_info(),
+        mint: ctx.accounts.output_mint.to_account_info(),
     };
 
     let cpi_transfer = CpiContext::new(
@@ -277,6 +278,7 @@ pub fn light_cpi<'info>(
     cpi_inputs
         .invoke_light_system_program(cpi_accounts)
         .map_err(ProgramError::from)?;
+
     Ok(escrow_address)
 }
 

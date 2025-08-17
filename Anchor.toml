@@ -20,4 +20,5 @@ test-cancel = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/canc
 test-ata = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/ata.test.ts"
 test-init = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/init.test.ts"
 test-fill = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/fill.test.ts"
+test-partial = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/partial-fill.test.ts"
 test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
