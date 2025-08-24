@@ -19,7 +19,7 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 
 const sol_mint = new PublicKey("So11111111111111111111111111111111111111112");
 
-async function create_ata(address: PublicKey) {
+export async function create_ata(address: PublicKey) {
   let compressed_account = await rpc.getCompressedAccount(
     bn(address.toBytes())
   );
@@ -40,6 +40,16 @@ async function create_ata(address: PublicKey) {
     throw new Error("call create wSOL instruction");
   }
 
+  const ata = await getAssociatedTokenAddress(
+    escrow_data.tokens.outputMint,
+    escrow_data.maker
+  );
+
+  const ata_exist = await rpc.getAccountInfo(ata);
+  if (ata_exist) {
+    throw new Error("ATA already exists");
+  }
+
   const { inAmount, outAmount, instruction_data, accounts, alt } =
     await get_swap_instruction(
       escrow_data.tokens.inputMint.toString(),
@@ -55,9 +65,16 @@ async function create_ata(address: PublicKey) {
     "ExactOut"
   );
 
-  const ata = await getAssociatedTokenAddress(
-    escrow_data.tokens.outputMint,
-    escrow_data.maker
+  const payer_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
+
+  const protocol_vault = PublicKey.findProgramAddressSync(
+    [Buffer.from("protocol_vault")],
+    program.programId
+  );
+
+  const protocol_ata = await getAssociatedTokenAddress(
+    sol_mint,
+    protocol_vault[0]
   );
 
   const instruction = await program.methods
@@ -96,8 +113,10 @@ async function create_ata(address: PublicKey) {
     })
     .accounts({
       payer: payer.publicKey,
+      payerWsolAta: payer_ata,
       maker: payer.publicKey,
       makerTokenAta: ata,
+      protocolWsolAta: protocol_ata,
       inputMint: escrow_data.tokens.inputMint,
       outputMint: escrow_data.tokens.outputMint,
       inputTokenProgram: escrow_data.tokens.inputTokenProgram,
@@ -140,7 +159,7 @@ async function create_ata(address: PublicKey) {
   return signature;
 }
 
-async function create_ata_wsol(address: PublicKey) {
+export async function create_ata_wsol(address: PublicKey) {
   let compressed_account = await rpc.getCompressedAccount(
     bn(address.toBytes())
   );
@@ -161,10 +180,101 @@ async function create_ata_wsol(address: PublicKey) {
     throw new Error("call create ata instruction");
   }
 
+  const ata = await getAssociatedTokenAddress(
+    escrow_data.tokens.outputMint,
+    escrow_data.maker
+  );
+
+  const ata_exist = await rpc.getAccountInfo(ata);
+  if (ata_exist) {
+    throw new Error("ATA already exists");
+  }
+
   const { instruction_data } = await get_swap_instruction(
     escrow_data.tokens.outputMint.toString(),
     sol_mint.toString(),
     2039280,
     "ExactOut"
   );
+
+  const instruction = await program.methods
+    .createAtaWsol({
+      swapData: Buffer.from(instruction_data, "base64"),
+      escrowAccount: {
+        maker: escrow_data.maker,
+        uniqueId: escrow_data.uniqueId,
+        tokens: {
+          inputMint: escrow_data.tokens.inputMint,
+          outputMint: escrow_data.tokens.outputMint,
+          inputTokenProgram: escrow_data.tokens.inputTokenProgram,
+          outputTokenProgram: escrow_data.tokens.outputTokenProgram,
+        },
+        amount: {
+          makingAmount: escrow_data.amount.makingAmount,
+          takingAmount: escrow_data.amount.takingAmount,
+          oriMakingAmount: escrow_data.amount.oriMakingAmount,
+          oriTakingAmount: escrow_data.amount.oriTakingAmount,
+        },
+        expiredAt: escrow_data.expiredAt,
+        slippageBps: escrow_data.slippageBps,
+        feeBps: escrow_data.feeBps,
+        createdAt: escrow_data.createdAt,
+        updatedAt: escrow_data.updatedAt,
+      },
+      proof: {
+        0: {
+          a: validityProof.a,
+          b: validityProof.b,
+          c: validityProof.c,
+        },
+      },
+      accountMeta: {
+        address: compressed_account.address,
+        treeInfo: {
+          rootIndex: proof.rootIndices[0],
+          merkleTreePubkeyIndex: 0,
+          queuePubkeyIndex: 1,
+          proveByIndex: false,
+          leafIndex: compressed_account.leafIndex,
+        },
+        outputStateTreeIndex: 0,
+      },
+    })
+    .accounts({
+      payer: payer.publicKey,
+      maker: escrow_data.maker,
+      outputMint: escrow_data.tokens.outputMint,
+      tokenProgram: escrow_data.tokens.inputTokenProgram,
+    })
+    .remainingAccounts(CLOSE_ACCOUNTS)
+    .instruction();
+
+  const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5"];
+
+  const altLookups = await Promise.all(
+    altAddresses.map(async (address: any) => {
+      const alt = await rpc.getAddressLookupTable(new PublicKey(address));
+      if (!alt.value) throw new Error(`ALT not found: ${address}`);
+      return new AddressLookupTableAccount({
+        key: new PublicKey(address),
+        state: alt.value.state,
+      });
+    })
+  );
+
+  const latestBlockhash = await rpc.getLatestBlockhash();
+  const message = new TransactionMessage({
+    payerKey: payer.publicKey,
+    recentBlockhash: latestBlockhash.blockhash,
+    instructions: [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+      instruction,
+    ],
+  }).compileToV0Message(altLookups);
+
+  const tx = new VersionedTransaction(message);
+  tx.sign([payer]);
+
+  const signature = await rpc.sendTransaction(tx);
+  return signature;
 }

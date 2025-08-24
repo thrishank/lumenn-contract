@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
+    token::spl_token,
     token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 use light_sdk::{
@@ -24,6 +25,7 @@ pub struct CreateTokenWsol<'info> {
     /// CHECK: This account is the owner of the new token account
     pub maker: AccountInfo<'info>,
 
+    #[account(address = spl_token::native_mint::ID)]
     pub sol_mint: InterfaceAccount<'info, Mint>,
 
     pub output_mint: InterfaceAccount<'info, Mint>,
