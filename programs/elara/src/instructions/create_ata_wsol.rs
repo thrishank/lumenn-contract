@@ -105,8 +105,9 @@ pub fn create_token_account<'info>(
 
     transfer_sol_from_vault(&ctx, 2039280)?;
 
-    light_cpi(&ctx, &args, jup_data.in_amount)?;
-    Ok(())
+    light_cpi(&ctx, &args, jup_data.in_amount)
+
+    // ata created in the accounts macro
 }
 
 fn light_cpi<'info>(
@@ -191,7 +192,5 @@ pub fn transfer_sol_from_vault<'info>(
         cpi_transfer.with_signer(signer_seeds),
         amount,
         ctx.accounts.sol_mint.decimals,
-    )?;
-
-    Ok(())
+    )
 }

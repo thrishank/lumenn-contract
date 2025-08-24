@@ -188,6 +188,12 @@ pub fn cancel<'info>(
         &signer_seeds,
     );
 
+    transfer_checked(
+        cpi_transfer,
+        escrow_account.amount.making_amount,
+        ctx.accounts.input_mint.decimals,
+    )?;
+
     emit!(OrderCancelled {
         escrow_addrees,
         maker: ctx.accounts.maker.key(),
@@ -199,11 +205,7 @@ pub fn cancel<'info>(
         timestamp: Clock::get()?.unix_timestamp,
     });
 
-    transfer_checked(
-        cpi_transfer,
-        escrow_account.amount.making_amount,
-        ctx.accounts.input_mint.decimals,
-    )
+    Ok(())
 }
 
 #[event]

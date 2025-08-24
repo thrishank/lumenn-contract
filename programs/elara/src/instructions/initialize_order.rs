@@ -158,6 +158,22 @@ pub fn init<'info>(
     cpi.invoke_light_system_program(light_cpi_accounts)
         .map_err(ProgramError::from)?;
 
+    let transfer_accounts = TransferChecked {
+        from: ctx.accounts.maker_input_mint_ata.to_account_info(),
+        to: ctx.accounts.protocol_vault_input_mint_ata.to_account_info(),
+        mint: ctx.accounts.input_mint.to_account_info(),
+        authority: ctx.accounts.maker.to_account_info(),
+    };
+
+    transfer_checked(
+        CpiContext::new(
+            ctx.accounts.input_token_program.to_account_info(),
+            transfer_accounts,
+        ),
+        order_args.making_amount,
+        ctx.accounts.input_mint.decimals,
+    )?;
+
     emit!(OrderInitialized {
         escrow_address,
         maker: ctx.accounts.maker.key(),
@@ -172,23 +188,7 @@ pub fn init<'info>(
         expired_at: order_args.expired_at.unwrap_or(0),
     });
 
-    let transfer_accounts = TransferChecked {
-        from: ctx.accounts.maker_input_mint_ata.to_account_info(),
-        to: ctx.accounts.protocol_vault_input_mint_ata.to_account_info(),
-        mint: ctx.accounts.input_mint.to_account_info(),
-        authority: ctx.accounts.maker.to_account_info(),
-    };
-
-    let cpi_transfer = CpiContext::new(
-        ctx.accounts.input_token_program.to_account_info(),
-        transfer_accounts,
-    );
-
-    transfer_checked(
-        cpi_transfer,
-        order_args.making_amount,
-        ctx.accounts.input_mint.decimals,
-    )
+    Ok(())
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]

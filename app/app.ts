@@ -150,6 +150,7 @@ app.get("/fill", async (req, res) => {
   return res.status(200).json({ sig });
 });
 
-app.get("/expired", async (req, res) => {});
-app.get("/create_ata", async (req, res) => {});
-app.get("/create_ata_wsol", async (req, res) => {});
+// TODO: create ata functions
+app.get("/expired", async (req, res) => {
+  // create the ata if not already and then call cancel order
+});

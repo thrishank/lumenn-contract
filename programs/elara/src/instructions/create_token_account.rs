@@ -157,8 +157,8 @@ pub fn create_token_account<'info>(
         jup_data.in_amount,
         args.taking_amount,
     )?;
-    create_associated_token_account(&ctx)?;
-    Ok(())
+
+    create_associated_token_account(&ctx)
 }
 
 fn transfer_tokens<'info>(ctx: &Context<'_, '_, '_, 'info, CreateToken<'info>>) -> Result<()> {
