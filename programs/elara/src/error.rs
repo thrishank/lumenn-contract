@@ -58,4 +58,6 @@ pub enum CustomError {
     NotWritable,
     #[msg("Invalid number of Accounts")]
     InvalidNumberOfAccounts,
+    #[msg("Taking account SOL ata is created separately")]
+    SolAtaCreatedSeparately,
 }

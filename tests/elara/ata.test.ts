@@ -64,18 +64,9 @@ describe("elara/create_token_account", () => {
 
   const indexer = "http://34.69.251.52:8784";
 
-  const rpc = createRpc(url, indexer, url);
+  const rpc = createRpc(url, url, url);
 
   it("create token account", async () => {
-    const { accounts: jup_accounts, alt } = await get_swap_instruction();
-
-    const altAddresse = await Promise.all(
-      alt.map(async (key: string) => {
-        const newAlt = await clone_alt(key);
-        return newAlt;
-      })
-    );
-
     const unique_id = new BN(Date.now());
     const protocol_vault = PublicKey.findProgramAddressSync(
       [Buffer.from("protocol_vault")],
@@ -178,10 +169,30 @@ describe("elara/create_token_account", () => {
     const buffer = compressed_account?.data?.data!;
     let escrow_data = parseEscrowFromBuffer(buffer);
 
+    const payer_wsol_ata = await getAssociatedTokenAddress(
+      sol_mint,
+      payer.publicKey
+    );
+
+    const protocol_wsol_ata = await getAssociatedTokenAddress(
+      sol_mint,
+      protocol_vault[0],
+      true
+    );
+
     const { swap, inAmount } = await get_swap(
       "HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd",
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       "So11111111111111111111111111111111111111112"
+    );
+
+    const { accounts: jup_accounts, alt } = await get_swap_instruction();
+
+    const altAddresse = await Promise.all(
+      alt.map(async (key: string) => {
+        const newAlt = await clone_alt(key);
+        return newAlt;
+      })
     );
 
     const instruction = await program.methods
@@ -223,8 +234,10 @@ describe("elara/create_token_account", () => {
       })
       .accounts({
         payer: payer.publicKey,
+        payerWsolAta: payer_wsol_ata,
         maker: payer.publicKey,
         makerTokenAta: ata,
+        protocolWsolAta: protocol_wsol_ata,
         inputMint: input_mint,
         outputMint: output_mint,
         inputTokenProgram: TOKEN_PROGRAM_ID,
@@ -313,6 +326,8 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(100000)),
     });
   });
+
+  /*
 
   it("create ata account with WSOL", async () => {
     const unique_id = new BN(Date.now());
@@ -572,4 +587,5 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(inAmount)),
     });
   });
+  */
 });

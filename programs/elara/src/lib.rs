@@ -36,8 +36,8 @@ pub mod elara {
         initialize_order::init(ctx, init_order_args, light_args)
     }
 
-    // cancel an existing order by maker or cancel when expired
-    // returns the tokens back to the maker and close the compressed escrow PDA aacount
+    /// cancel an existing order by maker or cancel when expired
+    /// returns the tokens back to the maker and close the compressed escrow PDA aacount
     pub fn cancel_order<'info>(
         ctx: Context<'_, '_, '_, 'info, CancelOrder<'info>>,
         args: CancelOrderParams,
@@ -45,9 +45,10 @@ pub mod elara {
         cancel_order::cancel(ctx, args)
     }
 
-    // to send the output tokens to the maker, maker needs to have an associated token account
-    // usallay created when initializing the order but if they close we create it
-    // take samll amount from the making amount and swap it SOL and create the ATA
+    /// To send the output tokens to the maker, maker needs to have an associated token account
+    /// usallay created when initializing the order but if they close we create it
+    /// take samll amount from the making amount and swap it wSOL and send it to the payer
+    /// payer create the ATA
     #[instruction(discriminator = [0])]
     pub fn create_ata<'info>(
         ctx: Context<'_, '_, '_, 'info, CreateToken<'info>>,
@@ -56,10 +57,10 @@ pub mod elara {
         create_token_account::create_token_account(ctx, args)
     }
 
-    // if the making tokens is WSOL then no need to swap
-    // take small amount from it and send it payer
-    // payer create the output ATA.
-    // update's the amount state. sub both making and taking amount
+    /// If the making tokens is WSOL then no need to swap
+    /// take small amount from it and send it payer
+    /// payer create the output ATA.
+    /// update's the amount state. sub both making and taking amount
     #[instruction(discriminator = [1])]
     pub fn create_ata_wsol<'info>(
         ctx: Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
@@ -68,11 +69,11 @@ pub mod elara {
         create_ata_wsol::create_token_account(ctx, args)
     }
 
-    // fill the order when the price reaches the user target
-    // this instruction will be called a worker that is monitoring the price
-    // swap the token in vault using jupiter cpi
-    // close the light compressed escrow account
-    // transfer the output tokens to the maker
+    /// fill the order when the price reaches the user target
+    /// this instruction will be called a worker that is monitoring the price
+    /// swap the token in vault using jupiter cpi
+    /// close the light compressed escrow account
+    /// transfer the output tokens to the maker
     #[instruction(discriminator = [2])]
     pub fn fill_order<'info>(
         ctx: Context<'_, '_, '_, 'info, FillOrder<'info>>,
@@ -81,9 +82,9 @@ pub mod elara {
         fill_order::fill(ctx, args)
     }
 
-    // partial fill the order when the price reaches the user target
-    // used when there is limited liquidity in the market
-    // light compressed escrow account state udpated not closed
+    /// partial fill the order when the price reaches the user target
+    /// used when there is limited liquidity in the market
+    /// light compressed escrow account state udpated not closed
     #[instruction(discriminator = [3])]
     pub fn partial_fill<'info>(
         ctx: Context<'_, '_, '_, 'info, PartialFill<'info>>,

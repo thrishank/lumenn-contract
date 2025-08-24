@@ -98,8 +98,8 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
-    let is_making_sol = ctx.accounts.sol_mint.key().to_string() == SOL_MINT
-        && args.escrow_account.tokens.input_mint.key().to_string() == SOL_MINT;
+    let is_making_sol = ctx.accounts.sol_mint.key() == SOL_MINT
+        && args.escrow_account.tokens.input_mint.key() == SOL_MINT;
 
     require!(is_making_sol, CustomError::InvalidInputMint);
 

@@ -7,7 +7,7 @@ pub const PROTOCOL_VAULT_SEED: &[u8] = b"protocol_vault";
 pub const PROTOCOL_VAULT_BUMP: u8 = 254;
 
 #[constant]
-pub const SOL_MINT: &str = "So11111111111111111111111111111111111111112";
+pub const SOL_MINT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
 
 #[constant]
 pub const PROTOCOL_VAULT: Pubkey = pubkey!("HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd");

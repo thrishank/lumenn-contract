@@ -2,9 +2,10 @@ use std::str::FromStr;
 
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::{create, Create};
+use anchor_spl::token::spl_token;
 use anchor_spl::{
     associated_token::{get_associated_token_address, AssociatedToken},
-    token_interface::{Mint, TokenAccount, TokenInterface},
+    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 use light_sdk::address::v1::derive_address;
 use light_sdk::instruction::PackedStateTreeInfo;
@@ -25,23 +26,30 @@ use crate::{
     error::CustomError, state::EscrowAccount, swap_cpi, LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
 
-use crate::{parse_jupiter_route_data, SOL_MINT};
+use crate::{parse_jupiter_route_data, ATA_CREATION_AMOUNT, SOL_MINT};
 
 #[derive(Accounts)]
 pub struct CreateToken<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// CHECK: This account is the owner of the new token account
+    /// Payer’s WSOL ATA
+    #[account(mut)]
+    pub payer_wsol_ata: UncheckedAccount<'info>,
+
+    /// Maker account  
     pub maker: UncheckedAccount<'info>,
 
-    // pub mint: InterfaceAccount<'info, Mint>,
-    pub input_mint: InterfaceAccount<'info, Mint>,
-    pub output_mint: InterfaceAccount<'info, Mint>,
-
-    /// CHECK: check in program logic
+    /// Maker token ATA to be created
     #[account(mut)]
     pub maker_token_ata: UncheckedAccount<'info>,
+
+    /// SOL mint (Native Mint, fixed address)
+    #[account(address = spl_token::native_mint::ID)]
+    pub sol_mint: UncheckedAccount<'info>,
+
+    pub input_mint: InterfaceAccount<'info, Mint>,
+    pub output_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
@@ -50,13 +58,14 @@ pub struct CreateToken<'info> {
     )]
     pub protocol_vault: SystemAccount<'info>,
 
-    // #[account(
-    //     mut,
-    //     associated_token::mint = input_mint,
-    //     associated_token::authority = protocol_vault,
-    //     associated_token::token_program = input_token_program
-    // )]
-    // pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
+    /// Protocol WSOL ATA
+    #[account(mut)]
+    pub protocol_wsol_ata: UncheckedAccount<'info>,
+
+    /// SPL Token program
+    #[account(address = spl_token::ID)]
+    pub token_program: UncheckedAccount<'info>,
+
     pub input_token_program: Interface<'info, TokenInterface>,
     pub output_token_program: Interface<'info, TokenInterface>,
 
@@ -115,7 +124,7 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
-    let is_making_sol = ctx.accounts.input_mint.key().to_string() == SOL_MINT;
+    let is_making_sol = ctx.accounts.input_mint.key() == SOL_MINT;
 
     if is_making_sol {
         return Err(error!(CustomError::InvalidCreateAtaInstruction));
@@ -127,9 +136,9 @@ pub fn create_token_account<'info>(
     //     &jup_data.route,
     //     jupiter_accounts,
     //     ctx.accounts.input_mint.key(),
-    //     ctx.accounts.output_mint.key(),
+    //     SOL_MINT,
     //     ctx.accounts.input_token_program.key(),
-    //     ctx.accounts.output_token_program.key(),
+    //     ,
     // )?;
     //
     // swap_cpi(
@@ -139,6 +148,8 @@ pub fn create_token_account<'info>(
     //     &ctx.accounts.protocol_vault.to_account_info(),
     // )?;
 
+    transfer_tokens(&ctx)?;
+
     light_cpi(
         &ctx,
         light_accounts,
@@ -147,6 +158,45 @@ pub fn create_token_account<'info>(
         args.taking_amount,
     )?;
     create_associated_token_account(&ctx)?;
+    Ok(())
+}
+
+fn transfer_tokens<'info>(ctx: &Context<'_, '_, '_, 'info, CreateToken<'info>>) -> Result<()> {
+    require_keys_eq!(
+        ctx.accounts.payer_wsol_ata.key(),
+        get_associated_token_address(&ctx.accounts.payer.key(), &SOL_MINT),
+        CustomError::InvalidTokenAccount
+    );
+
+    require_keys_eq!(
+        ctx.accounts.protocol_wsol_ata.key(),
+        get_associated_token_address(&ctx.accounts.protocol_vault.key(), &SOL_MINT),
+        CustomError::InvalidTokenAccount
+    );
+
+    require_keys_eq!(
+        ctx.accounts.sol_mint.key(),
+        SOL_MINT,
+        CustomError::InvalidMint
+    );
+
+    let cpi_accounts = TransferChecked {
+        from: ctx.accounts.protocol_wsol_ata.to_account_info(),
+        to: ctx.accounts.payer_wsol_ata.to_account_info(),
+        authority: ctx.accounts.protocol_vault.to_account_info(),
+        mint: ctx.accounts.sol_mint.to_account_info(),
+    };
+
+    let cpi_transfer = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+
+    let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
+
+    transfer_checked(
+        cpi_transfer.with_signer(signer_seeds),
+        ATA_CREATION_AMOUNT,
+        9,
+    )?;
+
     Ok(())
 }
 
@@ -243,7 +293,7 @@ pub fn create_associated_token_account<'info>(
     ctx: &Context<'_, '_, '_, 'info, CreateToken<'info>>,
 ) -> Result<()> {
     let cpi_accounts = Create {
-        payer: ctx.accounts.protocol_vault.to_account_info(),
+        payer: ctx.accounts.payer.to_account_info(),
         associated_token: ctx.accounts.maker_token_ata.to_account_info(),
         authority: ctx.accounts.maker.to_account_info(),
         mint: ctx.accounts.output_mint.to_account_info(),
@@ -254,9 +304,7 @@ pub fn create_associated_token_account<'info>(
     let cpi_program = ctx.accounts.associated_token_program.to_account_info();
     let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
 
-    let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
-
-    create(cpi_ctx.with_signer(signer_seeds))?;
+    create(cpi_ctx)?;
 
     Ok(())
 }

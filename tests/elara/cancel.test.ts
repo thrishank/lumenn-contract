@@ -59,7 +59,7 @@ describe("elara/cancel_order", () => {
 
   const indexer = "http://34.69.251.52:8784";
 
-  const rpc = createRpc(url, indexer, url);
+  const rpc = createRpc(url, url, url);
 
   it("cancel escrow", async () => {
     const unique_id = new BN(Date.now());
