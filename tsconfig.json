@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "outDir": "dist",
     "types": ["mocha", "chai"],
     "typeRoots": ["./node_modules/@types"],
     "lib": ["es2015"],
@@ -7,5 +8,6 @@
     "target": "es6",
     "esModuleInterop": true,
     "resolveJsonModule": true
-  }
+  },
+  "exclude": ["tests", "programs", "migrations", "node_modules"]
 }

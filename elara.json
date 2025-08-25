@@ -9,6 +9,10 @@
   "instructions": [
     {
       "name": "cancel_order",
+      "docs": [
+        "cancel an existing order by maker or cancel when expired",
+        "returns the tokens back to the maker and close the compressed escrow PDA aacount"
+      ],
       "discriminator": [
         95,
         129,
@@ -206,6 +210,12 @@
     },
     {
       "name": "create_ata",
+      "docs": [
+        "To send the output tokens to the maker, maker needs to have an associated token account",
+        "usallay created when initializing the order but if they close we create it",
+        "take samll amount from the making amount and swap it wSOL and send it to the payer",
+        "payer create the ATA"
+      ],
       "discriminator": [
         0
       ],
@@ -216,17 +226,37 @@
           "signer": true
         },
         {
-          "name": "maker"
+          "name": "payer_wsol_ata",
+          "docs": [
+            "Payer’s WSOL ATA"
+          ],
+          "writable": true
+        },
+        {
+          "name": "maker",
+          "docs": [
+            "Maker account"
+          ]
+        },
+        {
+          "name": "maker_token_ata",
+          "docs": [
+            "Maker token ATA to be created"
+          ],
+          "writable": true
+        },
+        {
+          "name": "sol_mint",
+          "docs": [
+            "SOL mint (Native Mint, fixed address)"
+          ],
+          "address": "So11111111111111111111111111111111111111112"
         },
         {
           "name": "input_mint"
         },
         {
           "name": "output_mint"
-        },
-        {
-          "name": "maker_token_ata",
-          "writable": true
         },
         {
           "name": "protocol_vault",
@@ -254,6 +284,20 @@
               }
             ]
           }
+        },
+        {
+          "name": "protocol_wsol_ata",
+          "docs": [
+            "Protocol WSOL ATA"
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "SPL Token program"
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "input_token_program"
@@ -286,6 +330,12 @@
     },
     {
       "name": "create_ata_wsol",
+      "docs": [
+        "If the making tokens is WSOL then no need to swap",
+        "take small amount from it and send it payer",
+        "payer create the output ATA.",
+        "update's the amount state. sub both making and taking amount"
+      ],
       "discriminator": [
         1
       ],
@@ -299,7 +349,8 @@
           "name": "maker"
         },
         {
-          "name": "sol_mint"
+          "name": "sol_mint",
+          "address": "So11111111111111111111111111111111111111112"
         },
         {
           "name": "output_mint"
@@ -527,6 +578,13 @@
     },
     {
       "name": "fill_order",
+      "docs": [
+        "fill the order when the price reaches the user target",
+        "this instruction will be called a worker that is monitoring the price",
+        "swap the token in vault using jupiter cpi",
+        "close the light compressed escrow account",
+        "transfer the output tokens to the maker"
+      ],
       "discriminator": [
         2
       ],
@@ -1038,6 +1096,11 @@
     },
     {
       "name": "partial_fill",
+      "docs": [
+        "partial fill the order when the price reaches the user target",
+        "used when there is limited liquidity in the market",
+        "light compressed escrow account state udpated not closed"
+      ],
       "discriminator": [
         3
       ],
@@ -2154,8 +2217,8 @@
     },
     {
       "name": "SOL_MINT",
-      "type": "string",
-      "value": "\"So11111111111111111111111111111111111111112\""
+      "type": "pubkey",
+      "value": "So11111111111111111111111111111111111111112"
     }
   ]
 }

@@ -36,6 +36,8 @@ export const rpc = createRpc(url, url, url);
 
 const app = express();
 
+app.listen(3000, () => console.log("Server running on port 3000"));
+
 app.get("/fill", async (req, res) => {
   let { order } = req.query;
 
@@ -78,9 +80,10 @@ app.get("/fill", async (req, res) => {
       escrow_data.tokens.inputMint.toString() ===
       "So11111111111111111111111111111111111111112"
     ) {
-      create_ata_wsol(address);
+      await create_ata_wsol(address);
+      // TODO: add ata creation confirmation
     } else {
-      create_ata(address);
+      await create_ata(address);
     }
   }
 
@@ -158,8 +161,9 @@ app.get("/fill", async (req, res) => {
     })
   );
 
-  // TODO: how to handle the WSOL transfers ?
+  // TODO: how to handle the WSOL transfers in fill,partial and expired cancel ?
   // currently closing the account auto unwrappes the WSOL but we can't close the account
+  // can't close the protocol vault. so create a middle account and close it
 
   const latestBlockhash = await rpc.getLatestBlockhash();
   const message = new TransactionMessage({
@@ -208,6 +212,10 @@ app.get("/expired", async (req, res) => {
 
   const escrow_data = parseEscrowFromBuffer(buffer);
 
+  if (escrow_data.expiredAt.toNumber() > Date.now()) {
+    throw new Error("Escrow not expired yet");
+  }
+
   const ata = await getAssociatedTokenAddress(
     escrow_data.tokens.outputMint,
     escrow_data.maker
@@ -220,9 +228,9 @@ app.get("/expired", async (req, res) => {
       escrow_data.tokens.inputMint.toString() ===
       "So11111111111111111111111111111111111111112"
     ) {
-      create_ata_wsol(address);
+      await create_ata_wsol(address);
     } else {
-      create_ata(address);
+      await create_ata(address);
     }
   }
 
@@ -267,10 +275,6 @@ app.get("/expired", async (req, res) => {
       outputTokenProgram: escrow_data.tokens.outputTokenProgram,
     })
     .remainingAccounts(CLOSE_ACCOUNTS)
-
-    .postInstructions([
-      // createCloseAccountInstruction(wSOL_ata, payer.publicKey, payer.publicKey),
-    ])
     .instruction();
 
   const latestBlockhash = await rpc.getLatestBlockhash();
