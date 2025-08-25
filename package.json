@@ -3,7 +3,8 @@
   "scripts": {
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
-    "build:app": "tsc"
+    "build:server": "tsc",
+    "start:server": "node dist/app/app.js"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
@@ -12,6 +13,7 @@
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.2",
     "axios": "^1.10.0",
+    "bn.js": "^5.2.2",
     "express": "^5.1.0"
   },
   "devDependencies": {
