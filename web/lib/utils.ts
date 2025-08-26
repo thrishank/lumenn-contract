@@ -76,3 +76,10 @@ export function parseOrderFromBuffer(buffer: Buffer): Order {
     updatedAt: new BN(updated_at.toString()),
   };
 }
+
+// Generate two 32-bit random numbers and combine them
+export function randomU64(): bigint {
+  const high = BigInt(Math.floor(Math.random() * 0x100000000)); // upper 32 bits
+  const low = BigInt(Math.floor(Math.random() * 0x100000000)); // lower 32 bits
+  return (high << 32n) | low;
+}

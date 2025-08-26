@@ -1,4 +1,10 @@
 "use client";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  createCloseAccountInstruction,
+  createSyncNativeInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
@@ -12,8 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { TrendingUp, X } from "lucide-react";
+import { TrendingUp, ArrowUpDown } from "lucide-react";
 import {
   ADDRESS_TREE,
   connection,
@@ -22,11 +27,13 @@ import {
   rpc,
   useProgram,
 } from "./program";
-import { Order, parseOrderFromBuffer } from "@/lib/utils";
+import { Order, parseOrderFromBuffer, randomU64 } from "@/lib/utils";
 import BN from "bn.js";
 import {
   ComputeBudgetProgram,
+  LAMPORTS_PER_SOL,
   PublicKey,
+  SystemProgram,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -35,9 +42,17 @@ import {
   deriveAddress,
   deriveAddressSeed,
 } from "@lightprotocol/stateless.js";
-import { ADDRESS_QUEUE, CLOSE_ACCOUNTS } from "@/lib/address";
+import {
+  ADDRESS_QUEUE,
+  CLOSE_ACCOUNTS,
+  INIT_REMAINING_ACCOUNTS,
+} from "@/lib/address";
+import { fetch_quote, search_tokens, Token } from "@/lib/jup";
+import { TokenSearchBox } from "@/components/token-search";
+import OrdersCard from "@/components/orders-card";
+import { TOKEN_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 
-export default function DeFiLimitOrderApp() {
+export default function App() {
   const { connected, publicKey, sendTransaction } = useWallet();
   const [orders, setOrders] = useState<Order[]>([]);
 
@@ -53,17 +68,219 @@ export default function DeFiLimitOrderApp() {
 
   const program = useProgram();
 
-  const [inputToken, setInputToken] = useState("SOL");
-  const [outputToken, setOutputToken] = useState("USDC");
-  const [inputAmount, setInputAmount] = useState("");
-  const [outputAmount, setOutputAmount] = useState("");
-  const [expiry, setExpiry] = useState("never");
-  const [targetRate, setTargetRate] = useState("");
-  const [sellRate, setSellRate] = useState("");
+  const [inputToken, setInputToken] = useState<Token>({
+    icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
+    id: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    name: "USDC",
+    symbol: "USDC",
+    decimals: 6,
+    token_program: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  });
+  const [outputToken, setOutputToken] = useState<Token>({
+    icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+    id: "So11111111111111111111111111111111111111112",
+    name: "Solana",
+    symbol: "SOL",
+    decimals: 9,
+    token_program: TOKEN_PROGRAM_ID.toString(),
+  });
 
-  const handleSubmitOrder = () => {
-    if (!inputToken || !outputToken || !inputAmount || !outputAmount || !expiry)
+  const [inputAmount, setInputAmount] = useState(5.0);
+  const [outputAmount, setOutputAmount] = useState(0.0);
+
+  useEffect(() => {
+    async function fetchOutputAmount() {
+      const data = await fetch_quote(
+        inputToken,
+        outputToken,
+        inputAmount * 10 ** inputToken.decimals
+      );
+      setOutputAmount(
+        data!.outAmount ? data!.outAmount / 10 ** outputToken.decimals : 0
+      );
+      setTargetRate(data?.current_ratio);
+    }
+    fetchOutputAmount();
+  }, [inputAmount, inputToken]);
+
+  const [expiry, setExpiry] = useState("never");
+  const [targetRate, setTargetRate] = useState<number>();
+
+  useEffect(() => {
+    setOutputAmount(inputAmount * (targetRate || 0));
+  }, [targetRate]);
+
+  const [searchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Token[]>([]);
+
+  useEffect(() => {
+    const fetchTokens = async () => {
+      // TODO: show this list when the wallet is not connected
+      // if connected then show the tokens in his wallet
+      if (searchQuery.length < 2) {
+        setSearchResults([
+          {
+            icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+            id: "So11111111111111111111111111111111111111112",
+            name: "Solana",
+            symbol: "SOL",
+            decimals: 9,
+            token_program: TOKEN_PROGRAM_ID.toString(),
+          },
+          {
+            icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
+            id: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            name: "USDC",
+            symbol: "USDC",
+            decimals: 6,
+            token_program: TOKEN_PROGRAM_ID.toString(),
+          },
+          {
+            icon: "https://raw.githubusercontent.com/ZeusNetworkHQ/zbtc-metadata/refs/heads/main/lgoo-v2.png",
+            id: "zBTCug3er3tLyffELcvDNrKkCymbPWysGcWihESYfLg",
+            name: "zBTC",
+            symbol: "zBTC",
+            decimals: 9,
+            token_program: TOKEN_PROGRAM_ID.toString(),
+          },
+          {
+            icon: "https://static.jup.ag/jup/icon.png",
+            id: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+            name: "Solana",
+            symbol: "Jupiter",
+            decimals: 6,
+            token_program: TOKEN_PROGRAM_ID.toString(),
+          },
+        ]);
+        return;
+      }
+      const tokens = await search_tokens(searchQuery);
+      setSearchResults(tokens);
+    };
+    fetchTokens();
+  }, [searchQuery]);
+
+  const handleSubmitOrder = async () => {
+    if (
+      !inputToken ||
+      !outputToken ||
+      !inputAmount ||
+      !outputAmount ||
+      !expiry ||
+      !publicKey
+    )
       return;
+
+    const unique_id = new BN(randomU64());
+
+    const seeds: Uint8Array[] = [
+      Buffer.from("escrow"),
+      unique_id.toArrayLike(Buffer, "le", 8),
+      publicKey.toBuffer(),
+    ];
+
+    const assetSeed = deriveAddressSeed(seeds, program!.programId);
+    const address = deriveAddress(assetSeed, ADDRESS_TREE);
+
+    const proof = await rpc.getValidityProofV0(undefined, [
+      {
+        address: bn(address.toBytes()),
+        tree: ADDRESS_TREE,
+        queue: ADDRESS_QUEUE,
+      },
+    ]);
+
+    const validityProof = proof.compressedProof;
+
+    console.log(expiry);
+
+    if (!program || !validityProof) return;
+
+    const instruction = await program.methods
+      .initializeOrder(
+        {
+          uniqueId: unique_id,
+          makingAmount: new BN(inputAmount * 10 ** inputToken.decimals),
+          takingAmount: new BN(outputAmount * 10 ** outputToken.decimals),
+          expiredAt: new BN(123141242141),
+          slippageBps: 50,
+        },
+        {
+          proof: {
+            0: {
+              a: validityProof.a,
+              b: validityProof.b,
+              c: validityProof.c,
+            },
+          },
+          addressTreeInfo: {
+            addressMerkleTreePubkeyIndex: 0,
+            addressQueuePubkeyIndex: 2,
+            rootIndex: proof.rootIndices[0],
+          },
+          outputStateTreeIndex: 1,
+        }
+      )
+      .accounts({
+        payer: publicKey,
+        maker: publicKey,
+        inputMint: new PublicKey("9stjYtrbCfYShqHuesfXk5od2V9P6Q7cs2eWdjQjyGJ"),
+        outputMint: new PublicKey(
+          "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+        ),
+        inputTokenProgram: inputToken.token_program,
+        outputTokenProgram: outputToken.token_program,
+      })
+      .remainingAccounts(INIT_REMAINING_ACCOUNTS)
+      .instruction();
+
+    const instructions = [];
+
+    if (inputToken.symbol === "SOL") {
+      const sol_mint = new PublicKey(inputToken.id);
+      const ata = await getAssociatedTokenAddress(sol_mint, publicKey);
+      instructions.push(
+        createAssociatedTokenAccountIdempotentInstruction(
+          publicKey,
+          ata,
+          publicKey,
+          sol_mint
+        )
+      );
+
+      instructions.push(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: ata,
+          lamports: inputAmount * LAMPORTS_PER_SOL,
+        })
+      );
+
+      instructions.push(createSyncNativeInstruction(ata));
+
+      instructions.push(instruction);
+
+      instructions.push(
+        createCloseAccountInstruction(ata, publicKey, publicKey)
+      );
+    } else {
+      instructions.push(instruction);
+    }
+
+    const latestBlockhash = await rpc.getLatestBlockhash();
+    const message = new TransactionMessage({
+      payerKey: publicKey,
+      recentBlockhash: latestBlockhash.blockhash,
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+        ...instructions,
+      ],
+    }).compileToV0Message();
+
+    const tx = new VersionedTransaction(message);
+
+    await sendTransaction(tx, connection);
+
     //
     // const newOrder: Order = {
     //   id: Date.now().toString(),
@@ -83,8 +300,8 @@ export default function DeFiLimitOrderApp() {
     // setOrders([newOrder, ...orders]);
 
     // Reset form
-    setInputAmount("");
-    setOutputAmount("");
+    setInputAmount(5);
+    setOutputAmount(0);
   };
 
   const cancelOrder = async (unique_id: BN, maker: PublicKey) => {
@@ -163,6 +380,8 @@ export default function DeFiLimitOrderApp() {
 
     const latestBlockhash = await rpc.getLatestBlockhash();
 
+    // TODO: handle wsol
+
     const message = new TransactionMessage({
       payerKey: publicKey,
       recentBlockhash: latestBlockhash.blockhash,
@@ -175,20 +394,20 @@ export default function DeFiLimitOrderApp() {
     await sendTransaction(tx, connection);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-secondary text-secondary-foreground";
-      case "filled":
-        return "bg-primary text-primary-foreground";
-      case "expired":
-        return "bg-muted text-muted-foreground";
-      case "cancelled":
-        return "bg-destructive text-destructive-foreground";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
+  // const getStatusColor = (status: string) => {
+  //   switch (status) {
+  //     case "pending":
+  //       return "bg-secondary text-secondary-foreground";
+  //     case "filled":
+  //       return "bg-primary text-primary-foreground";
+  //     case "expired":
+  //       return "bg-muted text-muted-foreground";
+  //     case "cancelled":
+  //       return "bg-destructive text-destructive-foreground";
+  //     default:
+  //       return "bg-muted text-muted-foreground";
+  //   }
+  // };
 
   return (
     <div className="min-h-screen bg-background cyber-grid">
@@ -223,42 +442,51 @@ export default function DeFiLimitOrderApp() {
             <div className="bg-slate-800/30 rounded-lg p-4">
               <Label className="text-slate-300">Selling</Label>
               <div className="flex items-center justify-between mt-2">
-                <Select value={inputToken} onValueChange={setInputToken}>
-                  <SelectTrigger className="w-20 border-none bg-transparent text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SOL">SOL</SelectItem>
-                    <SelectItem value="ETH">ETH</SelectItem>
-                    <SelectItem value="USDC">USDC</SelectItem>
-                  </SelectContent>
-                </Select>
+                <TokenSearchBox
+                  selectedToken={inputToken}
+                  setSelectedToken={setInputToken}
+                />
                 <input
+                  inputMode="decimal"
                   value={inputAmount}
-                  onChange={(e) => setInputAmount(e.target.value)}
+                  onChange={(e) => setInputAmount(Number(e.target.value))}
                   className="bg-transparent border-b border-slate-500 text-right text-white w-24"
                   placeholder="Amount"
                 />
               </div>
             </div>
 
+            <div className="flex justify-center my-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const tempToken = inputToken;
+                  setInputToken(outputToken);
+                  setOutputToken(tempToken);
+
+                  // swap amounts too
+                  const tempAmount = inputAmount;
+                  setInputAmount(outputAmount);
+                  setOutputAmount(tempAmount);
+                }}
+                className="p-2 rounded-full bg-slate-700 hover:bg-slate-600 transition"
+              >
+                <ArrowUpDown className="h-5 w-5 text-white" />
+              </button>
+            </div>
+
             {/* Buying */}
             <div className="bg-slate-800/30 rounded-lg p-4">
               <Label className="text-slate-300">Buying</Label>
               <div className="flex items-center justify-between mt-2">
-                <Select value={outputToken} onValueChange={setOutputToken}>
-                  <SelectTrigger className="w-24 border-none bg-transparent text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USDC">USDC</SelectItem>
-                    <SelectItem value="USDT">USDT</SelectItem>
-                    <SelectItem value="DAI">DAI</SelectItem>
-                  </SelectContent>
-                </Select>
+                <TokenSearchBox
+                  selectedToken={outputToken}
+                  setSelectedToken={setOutputToken}
+                />
                 <input
+                  inputMode="decimal"
                   value={outputAmount}
-                  onChange={(e) => setOutputAmount(e.target.value)}
+                  onChange={(e) => setOutputAmount(Number(e.target.value))}
                   className="bg-transparent border-b border-slate-500 text-right text-white w-24"
                   placeholder="Amount"
                 />
@@ -272,12 +500,15 @@ export default function DeFiLimitOrderApp() {
                 <Label className="text-slate-300 text-sm">Target Rate</Label>
                 <div className="flex items-center gap-2 mt-1">
                   <input
+                    inputMode="decimal"
                     value={targetRate}
-                    onChange={(e) => setTargetRate(e.target.value)}
+                    onChange={(e) => setTargetRate(Number(e.target.value))}
                     className="bg-transparent border-b border-slate-500 text-white w-28 text-sm"
                     placeholder="e.g. 196.42"
                   />
-                  <span className="text-slate-400 text-sm">{outputToken}</span>
+                  <span className="text-slate-400 text-sm">
+                    {outputToken.name}
+                  </span>
                 </div>
               </div>
 
@@ -309,82 +540,40 @@ export default function DeFiLimitOrderApp() {
           </CardContent>
         </Card>
 
+        <OrdersCard orders={orders} cancelOrder={cancelOrder} />
+
         {/* Orders Section */}
-        <Card className="cyber-border cyber-glow w-full max-w-3xl">
-          <CardHeader>
-            <CardTitle>Your Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Open Orders */}
-            <div className="space-y-4">
-              <h3 className="font-semibold">Open Orders</h3>
-              {orders.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  No open orders
-                </div>
-              ) : (
-                orders.map((order, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between p-4 border border-border rounded-lg cyber-border"
-                  >
-                    <div className="flex-1">
-                      <div className="text-sm text-muted-foreground">
-                        {order.amount.makingAmount.toNumber()}{" "}
-                        {order.tokens.inputMint.toString()} →{" "}
-                        {order.amount.takingAmount.toNumber()}{" "}
-                        {order.tokens.outputMint.toString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Created At: {order.createdAt.toNumber()} | Expires:{" "}
-                        {order.expiredAt.toNumber()}
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => cancelOrder(order.uniqueId, order.maker)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-            {/* Order History */}
-            {/* <div className="space-y-4 mt-8"> */}
-            {/*   <h3 className="font-semibold">Order History</h3> */}
-            {/*   {orders.filter((o) => o.status !== "pending").length === 0 ? ( */}
-            {/*     <div className="text-center py-4 text-muted-foreground"> */}
-            {/*       No order history */}
-            {/*     </div> */}
-            {/*   ) : ( */}
-            {/*     orders */}
-            {/*       .filter((o) => o.status !== "pending") */}
-            {/*       .map((order) => ( */}
-            {/*         <div */}
-            {/*           key={order.id} */}
-            {/*           className="flex items-center justify-between p-4 border border-border rounded-lg cyber-border" */}
-            {/*         > */}
-            {/*           <div className="flex-1"> */}
-            {/*             <Badge className={getStatusColor(order.status)}> */}
-            {/*               {order.status.toUpperCase()} */}
-            {/*             </Badge> */}
-            {/*             <div className="text-sm text-muted-foreground"> */}
-            {/*               {order.inputAmount} {order.inputToken} →{" "} */}
-            {/*               {order.outputAmount} {order.outputToken} */}
-            {/*             </div> */}
-            {/*             <div className="text-xs text-muted-foreground"> */}
-            {/*               Price: {order.price} | Completed: {order.timestamp} */}
-            {/*             </div> */}
-            {/*           </div> */}
-            {/*         </div> */}
-            {/*       )) */}
-            {/*   )} */}
-            {/* </div> */}
-          </CardContent>
-        </Card>
+        {/* Order History */}
+        {/* <div className="space-y-4 mt-8"> */}
+        {/*   <h3 className="font-semibold">Order History</h3> */}
+        {/*   {orders.filter((o) => o.status !== "pending").length === 0 ? ( */}
+        {/*     <div className="text-center py-4 text-muted-foreground"> */}
+        {/*       No order history */}
+        {/*     </div> */}
+        {/*   ) : ( */}
+        {/*     orders */}
+        {/*       .filter((o) => o.status !== "pending") */}
+        {/*       .map((order) => ( */}
+        {/*         <div */}
+        {/*           key={order.id} */}
+        {/*           className="flex items-center justify-between p-4 border border-border rounded-lg cyber-border" */}
+        {/*         > */}
+        {/*           <div className="flex-1"> */}
+        {/*             <Badge className={getStatusColor(order.status)}> */}
+        {/*               {order.status.toUpperCase()} */}
+        {/*             </Badge> */}
+        {/*             <div className="text-sm text-muted-foreground"> */}
+        {/*               {order.inputAmount} {order.inputToken} →{" "} */}
+        {/*               {order.outputAmount} {order.outputToken} */}
+        {/*             </div> */}
+        {/*             <div className="text-xs text-muted-foreground"> */}
+        {/*               Price: {order.price} | Completed: {order.timestamp} */}
+        {/*             </div> */}
+        {/*           </div> */}
+        {/*         </div> */}
+        {/*       )) */}
+        {/*   )} */}
+        {/* </div> */}
       </div>
     </div>
   );
