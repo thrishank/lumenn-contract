@@ -9,7 +9,6 @@ import {
 import { Program } from "@coral-xyz/anchor";
 import { Elara } from "../../target/types/elara";
 import {
-  AddressLookupTableAccount,
   ComputeBudgetProgram,
   Keypair,
   PublicKey,

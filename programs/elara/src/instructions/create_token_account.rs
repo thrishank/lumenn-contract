@@ -101,6 +101,10 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::TokenAccountAlreadyExists));
     }
 
+    if ctx.accounts.output_mint.key() == SOL_MINT {
+        return Err(error!(CustomError::TokenAccountAlreadyExists));
+    };
+
     let remaining = &ctx.remaining_accounts;
     let light_accounts = &remaining[0..10];
 

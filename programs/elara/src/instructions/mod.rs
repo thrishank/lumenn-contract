@@ -15,3 +15,6 @@ pub use create_token_account::*;
 
 pub mod create_ata_wsol;
 pub use create_ata_wsol::*;
+
+pub mod expire_wsol_order;
+pub use expire_wsol_order::*;

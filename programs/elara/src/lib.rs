@@ -45,6 +45,19 @@ pub mod elara {
         cancel_order::cancel(ctx, args)
     }
 
+    /// when the input_mint is WSOL, to unwrap it back to sol, during cancel the wsol is transferrred to maker wsol ata
+    /// the maker ata can only be closed by the maker. so while expiring the order we can't unwrap
+    /// since the funds are stored in a protocol vault, and can't close it. So we will create a new
+    /// temporary ata owned the Program, transfer the wsol to that ata and close it with
+    /// destination = maker. this will unwrap the wsol back to SOL
+    /// friction less limit orders mf
+    pub fn expire_wsol_order<'info>(
+        ctx: Context<'_, '_, '_, 'info, ExpireOrder<'info>>,
+        args: CancelOrderParams,
+    ) -> Result<()> {
+        expire_wsol_order::expire(ctx, args)
+    }
+
     /// To send the output tokens to the maker, maker needs to have an associated token account
     /// usallay created when initializing the order but if they close we create it
     /// take samll amount from the making amount and swap it wSOL and send it to the payer

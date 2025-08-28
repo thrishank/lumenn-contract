@@ -60,4 +60,6 @@ pub enum CustomError {
     InvalidNumberOfAccounts,
     #[msg("Taking account SOL ata is created separately")]
     SolAtaCreatedSeparately,
+    #[msg("Order not expired")]
+    OrderNotExpired,
 }
