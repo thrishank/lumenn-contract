@@ -18,3 +18,9 @@ pub use create_ata_wsol::*;
 
 pub mod expire_wsol_order;
 pub use expire_wsol_order::*;
+
+pub mod fill_wsol_order;
+pub use fill_wsol_order::*;
+
+pub mod partial_fill_wsol_order;
+pub use partial_fill_wsol_order::*;

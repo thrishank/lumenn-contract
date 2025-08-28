@@ -36,6 +36,9 @@ pub mod elara {
         initialize_order::init(ctx, init_order_args, light_args)
     }
 
+    // checks needed to add
+    // https://chatgpt.com/c/68b00379-6f9c-8325-92d2-b0aac192c4ce
+
     /// cancel an existing order by maker or cancel when expired
     /// returns the tokens back to the maker and close the compressed escrow PDA aacount
     pub fn cancel_order<'info>(
@@ -104,6 +107,22 @@ pub mod elara {
         args: PartialFillOrderParams,
     ) -> Result<()> {
         partial_fill_order::partial_fill(ctx, args)
+    }
+
+    #[instruction(discriminator = [4])]
+    pub fn fill_wsol_order<'info>(
+        ctx: Context<'_, '_, '_, 'info, FillOrderWSol<'info>>,
+        args: FillOrderParams,
+    ) -> Result<()> {
+        fill_wsol_order::fill(ctx, args)
+    }
+
+    #[instruction(discriminator = [5])]
+    pub fn partial_fill_wsol<'info>(
+        ctx: Context<'_, '_, '_, 'info, PartialFillWSol<'info>>,
+        args: PartialFillOrderParams,
+    ) -> Result<()> {
+        partial_fill_wsol_order::partial_fill(ctx, args)
     }
 }
 

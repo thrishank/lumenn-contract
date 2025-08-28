@@ -6,7 +6,7 @@ use light_sdk::{
     account::LightAccount,
     address::v1::derive_address,
     cpi::{CpiAccounts, CpiInputs},
-    instruction::{account_meta::CompressedAccountMeta, PackedStateTreeInfo, ValidityProof},
+    instruction::account_meta::CompressedAccountMeta,
 };
 
 use anchor_spl::{
@@ -18,7 +18,7 @@ use anchor_spl::{
 use crate::{
     error::CustomError,
     instructions::CancelOrderParams,
-    state::{AccountParams, EscrowAccount, Tokens},
+    state::{EscrowAccount, Tokens},
     utils::{expected_accounts, validate_light_accounts, LightAccountSet},
     ATA_CREATION_AMOUNT,
 };
@@ -27,6 +27,15 @@ use crate::{
 pub struct ExpireOrder<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = sol_mint,
+        associated_token::authority = payer,
+        associated_token::token_program = input_token_program
+    )]
+    pub payer_wsol_ata: InterfaceAccount<'info, TokenAccount>,
 
     /// For expired orders, anyone can cancel (including workers/keepers)
     /// CHECK: Verified in instruction logic for expiration status
@@ -154,40 +163,47 @@ pub fn expire<'info>(
 
     let signer_seeds: [&[&[u8]]; 1] = [&[b"protocol_vault", &[ctx.bumps.protocol_vault]]];
 
-    let transfer_accounts = TransferChecked {
-        from: ctx.accounts.protocol_vault_input_mint_ata.to_account_info(),
-        to: ctx.accounts.temp_wsol_ata.to_account_info(),
-        mint: ctx.accounts.sol_mint.to_account_info(),
-        authority: ctx.accounts.protocol_vault.to_account_info(),
-    };
-
-    let cpi_transfer = CpiContext::new_with_signer(
-        ctx.accounts.input_token_program.to_account_info(),
-        transfer_accounts,
-        &signer_seeds,
-    );
-
     transfer_checked(
-        cpi_transfer,
+        CpiContext::new_with_signer(
+            ctx.accounts.input_token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.protocol_vault_input_mint_ata.to_account_info(),
+                to: ctx.accounts.temp_wsol_ata.to_account_info(),
+                mint: ctx.accounts.sol_mint.to_account_info(),
+                authority: ctx.accounts.protocol_vault.to_account_info(),
+            },
+            &signer_seeds,
+        ),
         escrow_account.amount.making_amount - ATA_CREATION_AMOUNT,
         ctx.accounts.sol_mint.decimals,
     )?;
 
-    let close_accounts = CloseAccount {
-        account: ctx.accounts.temp_wsol_ata.to_account_info(),
-        destination: ctx.accounts.maker.to_account_info(),
-        authority: ctx.accounts.temp_account.to_account_info(),
-    };
+    transfer_checked(
+        CpiContext::new_with_signer(
+            ctx.accounts.input_token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.protocol_vault_input_mint_ata.to_account_info(),
+                to: ctx.accounts.payer_wsol_ata.to_account_info(),
+                mint: ctx.accounts.sol_mint.to_account_info(),
+                authority: ctx.accounts.protocol_vault.to_account_info(),
+            },
+            &signer_seeds,
+        ),
+        ATA_CREATION_AMOUNT,
+        ctx.accounts.sol_mint.decimals,
+    )?;
 
     let temp_signer_seeds: [&[&[u8]]; 1] = [&[b"temp_account", &[ctx.bumps.temp_account]]];
 
-    let cpi_close = CpiContext::new_with_signer(
+    close_account(CpiContext::new_with_signer(
         ctx.accounts.input_token_program.to_account_info(),
-        close_accounts,
+        CloseAccount {
+            account: ctx.accounts.temp_wsol_ata.to_account_info(),
+            destination: ctx.accounts.maker.to_account_info(),
+            authority: ctx.accounts.temp_account.to_account_info(),
+        },
         &temp_signer_seeds,
-    );
-
-    close_account(cpi_close)?;
+    ))?;
 
     emit!(ExpireOrderEvent {
         escrow_account: escrow_addrees,
