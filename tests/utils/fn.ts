@@ -13,7 +13,7 @@ import { getKeypairFromFile } from "@solana-developers/helpers";
 import BN from "bn.js";
 import { Buffer } from "buffer";
 
-type Escrow = {
+export type Escrow = {
   maker: PublicKey;
   uniqueId: BN;
   tokens: {

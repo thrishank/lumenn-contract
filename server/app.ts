@@ -2,26 +2,21 @@ import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
 import { Elara } from "../target/types/elara";
 import IDL from "../target/idl/elara.json";
 import {
-  AddressLookupTableAccount,
-  ComputeBudgetProgram,
   Connection,
   Keypair,
   PublicKey,
-  TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 
 import express from "express";
 import { bn, createRpc } from "@lightprotocol/stateless.js";
-import {
-  ADDRESS_QUEUE,
-  ADDRESS_TREE,
-  CLOSE_ACCOUNTS,
-} from "../tests/utils/address";
+import { ADDRESS_QUEUE, ADDRESS_TREE } from "../tests/utils/address";
 import { parseEscrowFromBuffer } from "../tests/utils/fn";
 import { get_swap_instruction } from "./jup";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { create_ata, create_ata_wsol } from "./create_ata";
+import { fill, fill_wsol } from "./fill";
+import { expire, expire_wsol } from "./expire";
 
 export const payer = new Keypair();
 const connection = new Connection("https://api.devnet.solana.com");
@@ -33,6 +28,10 @@ const url =
   "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
 
 export const rpc = createRpc(url, url, url);
+
+export const SOL_MINT = new PublicKey(
+  "So11111111111111111111111111111111111111112"
+);
 
 const app = express();
 
@@ -60,17 +59,15 @@ app.get("/fill", async (req, res) => {
     bn(address.toBytes())
   );
 
+  const buffer = compressed_account?.data?.data!;
+  const escrow_data = parseEscrowFromBuffer(buffer);
+
   let hash = compressed_account.hash;
 
   let proof = await rpc.getValidityProofV0(
     [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
     []
   );
-
-  const validityProof = proof.compressedProof;
-  const buffer = compressed_account?.data?.data!;
-
-  const escrow_data = parseEscrowFromBuffer(buffer);
 
   const ata = await getAssociatedTokenAddress(
     escrow_data.tokens.outputMint,
@@ -107,79 +104,28 @@ app.get("/fill", async (req, res) => {
     return res.status(400).json("making amount not equal to input amount");
   }
 
-  const instruction = await program.methods
-    .fillOrder({
-      swapData: Buffer.from(instruction_data, "base64"),
-      escrowAccount: {
-        uniqueId: escrow_data.uniqueId,
-        amount: {
-          makingAmount: escrow_data.amount.makingAmount,
-          takingAmount: escrow_data.amount.takingAmount,
-          oriMakingAmount: escrow_data.amount.oriMakingAmount,
-          oriTakingAmount: escrow_data.amount.oriTakingAmount,
-        },
-        expiredAt: escrow_data.expiredAt,
-        slippageBps: escrow_data.slippageBps,
-        feeBps: escrow_data.feeBps,
-        createdAt: escrow_data.createdAt,
-        updatedAt: escrow_data.updatedAt,
-      },
-      proof: {
-        0: {
-          a: validityProof.a,
-          b: validityProof.b,
-          c: validityProof.c,
-        },
-      },
-      treeInfo: {
-        rootIndex: proof.rootIndices[0],
-        merkleTreePubkeyIndex: 0,
-        queuePubkeyIndex: 1,
-        proveByIndex: false,
-        leafIndex: compressed_account.leafIndex,
-      },
-      outputStateTreeIndex: 0,
-    })
-    .accounts({
-      payer: payer.publicKey,
-      maker: payer.publicKey,
-      inputMint: escrow_data.tokens.inputMint,
-      outputMint: escrow_data.tokens.outputMint,
-      inputTokenProgram: escrow_data.tokens.inputTokenProgram,
-      outputTokenProgram: escrow_data.tokens.outputTokenProgram,
-      jupiterProgram: new PublicKey(
-        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
-      ),
-    })
-    .remainingAccounts([...CLOSE_ACCOUNTS, ...accounts])
-    .instruction();
+  let tx: VersionedTransaction;
 
-  const altLookups = await Promise.all(
-    alt.map(async (address: any) => {
-      const alt = await rpc.getAddressLookupTable(new PublicKey(address));
-      if (!alt.value) throw new Error(`ALT not found: ${address}`);
-      return new AddressLookupTableAccount({
-        key: new PublicKey(address),
-        state: alt.value.state,
-      });
-    })
-  );
+  if (escrow_data.tokens.outputMint === SOL_MINT) {
+    tx = await fill_wsol(
+      compressed_account,
+      escrow_data,
+      proof,
+      instruction_data,
+      accounts,
+      alt
+    );
+  } else {
+    tx = await fill(
+      compressed_account,
+      escrow_data,
+      proof,
+      instruction_data,
+      accounts,
+      alt
+    );
+  }
 
-  // TODO: how to handle the WSOL transfers in fill,partial and expired cancel ?
-  // currently closing the account auto unwrappes the WSOL but we can't close the account
-  // can't close the protocol vault. so create a middle account and close it
-
-  const latestBlockhash = await rpc.getLatestBlockhash();
-  const message = new TransactionMessage({
-    payerKey: payer.publicKey,
-    recentBlockhash: latestBlockhash.blockhash,
-    instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-      instruction,
-    ],
-  }).compileToV0Message(altLookups);
-
-  const tx = new VersionedTransaction(message);
   tx.sign([payer]);
 
   const sig = await rpc.sendTransaction(tx);
@@ -211,7 +157,6 @@ app.get("/expired", async (req, res) => {
     []
   );
 
-  const validityProof = proof.compressedProof;
   const buffer = compressed_account?.data?.data!;
 
   const escrow_data = parseEscrowFromBuffer(buffer);
@@ -238,60 +183,14 @@ app.get("/expired", async (req, res) => {
     }
   }
 
-  const instruction = await program.methods
-    .cancelOrder({
-      escrowAccount: {
-        uniqueId: escrow_data.uniqueId,
-        amount: {
-          makingAmount: escrow_data.amount.makingAmount,
-          takingAmount: escrow_data.amount.takingAmount,
-          oriMakingAmount: escrow_data.amount.oriMakingAmount,
-          oriTakingAmount: escrow_data.amount.oriTakingAmount,
-        },
-        expiredAt: escrow_data.expiredAt,
-        slippageBps: escrow_data.slippageBps,
-        feeBps: escrow_data.feeBps,
-        createdAt: escrow_data.createdAt,
-        updatedAt: escrow_data.updatedAt,
-      },
-      proof: {
-        0: {
-          a: validityProof.a,
-          b: validityProof.b,
-          c: validityProof.c,
-        },
-      },
-      treeInfo: {
-        rootIndex: proof.rootIndices[0],
-        merkleTreePubkeyIndex: 0,
-        queuePubkeyIndex: 1,
-        proveByIndex: false,
-        leafIndex: compressed_account.leafIndex,
-      },
-      outputStateTreeIndex: 0,
-    })
-    .accounts({
-      payer: payer.publicKey,
-      maker: payer.publicKey,
-      inputMint: escrow_data.tokens.inputMint,
-      outputMint: escrow_data.tokens.outputMint,
-      inputTokenProgram: escrow_data.tokens.inputTokenProgram,
-      outputTokenProgram: escrow_data.tokens.outputTokenProgram,
-    })
-    .remainingAccounts(CLOSE_ACCOUNTS)
-    .instruction();
+  let tx: VersionedTransaction;
 
-  const latestBlockhash = await rpc.getLatestBlockhash();
-  const message = new TransactionMessage({
-    payerKey: payer.publicKey,
-    recentBlockhash: latestBlockhash.blockhash,
-    instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
-      instruction,
-    ],
-  }).compileToV0Message();
+  if (escrow_data.tokens.inputMint === SOL_MINT) {
+    tx = await expire_wsol(compressed_account, escrow_data, proof);
+  } else {
+    tx = await expire(compressed_account, escrow_data, proof);
+  }
 
-  const tx = new VersionedTransaction(message);
   tx.sign([payer]);
 
   const signature = await rpc.sendTransaction(tx);
