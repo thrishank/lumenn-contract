@@ -98,31 +98,12 @@ pub mod elara {
         fill_order::fill(ctx, args)
     }
 
-    /// partial fill the order when the price reaches the user target
-    /// used when there is limited liquidity in the market
-    /// light compressed escrow account state udpated not closed
     #[instruction(discriminator = [3])]
-    pub fn partial_fill<'info>(
-        ctx: Context<'_, '_, '_, 'info, PartialFill<'info>>,
-        args: PartialFillOrderParams,
-    ) -> Result<()> {
-        partial_fill_order::partial_fill(ctx, args)
-    }
-
-    #[instruction(discriminator = [4])]
     pub fn fill_wsol_order<'info>(
         ctx: Context<'_, '_, '_, 'info, FillOrderWSol<'info>>,
         args: FillOrderParams,
     ) -> Result<()> {
         fill_wsol_order::fill(ctx, args)
-    }
-
-    #[instruction(discriminator = [5])]
-    pub fn partial_fill_wsol<'info>(
-        ctx: Context<'_, '_, '_, 'info, PartialFillWSol<'info>>,
-        args: PartialFillOrderParams,
-    ) -> Result<()> {
-        partial_fill_wsol_order::partial_fill(ctx, args)
     }
 }
 

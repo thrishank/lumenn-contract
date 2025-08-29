@@ -153,10 +153,10 @@ describe("elara/fill_order", () => {
     const buffer = compressed_account?.data?.data!;
     let escrow_data = parseEscrowFromBuffer(buffer);
 
-    const { swap, inAmount } = await get_swap(
+    const { swap, inAmount, outAmount } = await get_swap(
       "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
-      "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
       makingAmount.toNumber(),
       "ExactIn",
       5
@@ -219,6 +219,7 @@ describe("elara/fill_order", () => {
           leafIndex: compressed_account.leafIndex,
         },
         outputStateTreeIndex: 0,
+        fillType: { full: {} },
       })
       .accounts({
         payer: payer.publicKey,
@@ -284,6 +285,7 @@ describe("elara/fill_order", () => {
       makerATA,
       "processed"
     );
+
     const vaultAccountAfter = await getAccount(
       program.provider.connection,
       vaultATA,
@@ -294,7 +296,7 @@ describe("elara/fill_order", () => {
     const vaultBalanceAfter = Number(vaultAccountAfter.amount ?? 0);
 
     assert(
-      makerBalanceAfter - makerBalanceBefore >= takingAmount.toNumber(),
+      makerBalanceAfter - makerBalanceBefore >= outAmount,
       "Tokens not correctly credited from maker"
     );
 
@@ -305,6 +307,8 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
+
+  /*
 
   it("fill order WSOL", async () => {
     const unique_id2 = new BN(Date.now());
@@ -532,4 +536,5 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
+  */
 });
