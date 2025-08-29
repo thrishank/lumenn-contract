@@ -84,11 +84,8 @@ app.get("/fill", async (req, res) => {
 
   const ata_exist = await rpc.getAccountInfo(ata);
 
-  if (!ata_exist) {
-    if (
-      escrow_data.tokens.inputMint.toString() ===
-      "So11111111111111111111111111111111111111112"
-    ) {
+  if (!ata_exist && escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+    if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
       await create_ata_wsol(address);
       // TODO: add ata creation confirmation
     } else {
@@ -116,7 +113,7 @@ app.get("/fill", async (req, res) => {
 
   let tx: VersionedTransaction;
 
-  if (escrow_data.tokens.outputMint === SOL_MINT) {
+  if (escrow_data.tokens.outputMint.equals(SOL_MINT)) {
     tx = await fill_wsol(
       compressed_account,
       escrow_data,
@@ -184,11 +181,8 @@ app.get("/expired", async (req, res) => {
 
   const ata_exist = await rpc.getAccountInfo(ata);
 
-  if (!ata_exist) {
-    if (
-      escrow_data.tokens.inputMint.toString() ===
-      "So11111111111111111111111111111111111111112"
-    ) {
+  if (!ata_exist && escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+    if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
       await create_ata_wsol(address);
     } else {
       await create_ata(address);
@@ -197,7 +191,7 @@ app.get("/expired", async (req, res) => {
 
   let tx: VersionedTransaction;
 
-  if (escrow_data.tokens.inputMint === SOL_MINT) {
+  if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
     tx = await expire_wsol(compressed_account, escrow_data, proof);
   } else {
     tx = await expire(compressed_account, escrow_data, proof);
