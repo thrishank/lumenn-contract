@@ -775,6 +775,7 @@ dependencies = [
  "light-hasher",
  "light-sdk",
  "light-sdk-types",
+ "solana-security-txt",
 ]
 
 [[package]]

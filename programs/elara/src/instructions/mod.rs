@@ -16,8 +16,5 @@ pub use expire_wsol_order::*;
 pub mod fill_wsol_order;
 pub use fill_wsol_order::*;
 
-// pub mod partial_fill_wsol_order;
-// pub use partial_fill_wsol_order::*;
-
 pub mod fill_order;
 pub use fill_order::*;

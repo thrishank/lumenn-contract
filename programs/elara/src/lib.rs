@@ -20,6 +20,15 @@ use instructions::*;
 
 use crate::error::CustomError;
 
+solana_security_txt::security_txt! {
+    name: "Limit Order Program V1",
+    contacts: "thris.dev@gmail.com",
+    source_code: "https://github.com/thrishank/native-escrow",
+    project_url: "https://github.com/thrishank/native-escrow",
+    policy: "",
+    preferred_languages: "en"
+}
+
 #[program]
 pub mod elara {
 

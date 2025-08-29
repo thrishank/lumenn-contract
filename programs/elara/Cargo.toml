@@ -22,3 +22,4 @@ anchor-spl = { version = "0.31.1", features = ["idl-build"] }
 light-sdk = { version = "0.13.0", features = ["anchor"] }
 light-hasher = { version = "3.0.0", features = ["solana"] }
 light-sdk-types = "0.13.0"
+solana-security-txt = "1.1.1"
