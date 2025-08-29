@@ -42,10 +42,14 @@ app.get("/", (req, res) => {
 });
 
 app.get("/fill", async (req, res) => {
-  let { order } = req.query;
+  let { order, fill_type } = req.query;
 
   if (!order) {
     return res.status(400).json({ error: "Missing address parameter" });
+  }
+
+  if (fill_type && fill_type !== "partial" && fill_type !== "full") {
+    return res.status(400).json({ error: "Invalid fill_type parameter" });
   }
 
   let address: PublicKey;
@@ -88,6 +92,8 @@ app.get("/fill", async (req, res) => {
     }
   }
 
+  // TODO: if parital then swap should be ExactOut
+
   const { inAmount, outAmount, instruction_data, accounts, alt } =
     await get_swap_instruction(
       escrow_data.tokens.inputMint.toString(),
@@ -111,6 +117,7 @@ app.get("/fill", async (req, res) => {
       compressed_account,
       escrow_data,
       proof,
+      fill_type === "partial" ? "partial" : "full",
       instruction_data,
       accounts,
       alt
@@ -120,6 +127,7 @@ app.get("/fill", async (req, res) => {
       compressed_account,
       escrow_data,
       proof,
+      fill_type === "partial" ? "partial" : "full",
       instruction_data,
       accounts,
       alt

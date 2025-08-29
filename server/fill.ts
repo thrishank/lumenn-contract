@@ -17,6 +17,7 @@ export async function fill(
   compressed_account: CompressedAccountWithMerkleContext,
   escrow_data: Escrow,
   proof: ValidityProofWithContext,
+  fill_type: "full" | "partial",
   instruction_data: any,
   accounts: any[],
   alt: any[]
@@ -55,6 +56,7 @@ export async function fill(
         leafIndex: compressed_account.leafIndex,
       },
       outputStateTreeIndex: 0,
+      fillType: fill_type === "full" ? { full: {} } : { partial: {} },
     })
     .accounts({
       payer: payer.publicKey,
@@ -100,6 +102,7 @@ export async function fill_wsol(
   compressed_account: CompressedAccountWithMerkleContext,
   escrow_data: Escrow,
   proof: ValidityProofWithContext,
+  fill_type: "full" | "partial",
   instruction_data: any,
   accounts: any[],
   alt: any[]
@@ -138,6 +141,7 @@ export async function fill_wsol(
         leafIndex: compressed_account.leafIndex,
       },
       outputStateTreeIndex: 0,
+      fillType: fill_type === "full" ? { full: {} } : { partial: {} },
     })
     .accounts({
       payer: payer.publicKey,
