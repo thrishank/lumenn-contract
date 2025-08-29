@@ -52,7 +52,7 @@ export async function expire(
     })
     .accounts({
       payer: payer.publicKey,
-      maker: payer.publicKey,
+      maker: escrow_data.maker,
       inputMint: escrow_data.tokens.inputMint,
       outputMint: escrow_data.tokens.outputMint,
       inputTokenProgram: escrow_data.tokens.inputTokenProgram,
@@ -116,7 +116,7 @@ export async function expire_wsol(
     })
     .accounts({
       payer: payer.publicKey,
-      maker: payer.publicKey,
+      maker: escrow_data.maker,
       outputMint: escrow_data.tokens.outputMint,
       inputTokenProgram: escrow_data.tokens.inputTokenProgram,
       outputTokenProgram: escrow_data.tokens.outputTokenProgram,
