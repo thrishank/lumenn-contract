@@ -18,6 +18,7 @@ use crate::{
     error::CustomError,
     state::{AccountParams, EscrowAccount, Tokens},
     utils::{expected_accounts, validate_light_accounts, LightAccountSet},
+    SOL_MINT,
 };
 
 #[derive(Accounts)]
@@ -144,6 +145,10 @@ pub fn cancel<'info>(
     // For expired orders, anyone can cancel (cleanup mechanism)
     if !is_expired {
         require!(ctx.accounts.maker.is_signer, CustomError::Unauthorized);
+    }
+
+    if is_expired && !ctx.accounts.maker.is_signer && ctx.accounts.input_mint.key() == SOL_MINT {
+        return Err(error!(CustomError::ExpireWSolInstruction));
     }
 
     if address != escrow.address().expect("Invalid escrow address") {

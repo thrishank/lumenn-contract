@@ -62,4 +62,6 @@ pub enum CustomError {
     SolAtaCreatedSeparately,
     #[msg("Order not expired")]
     OrderNotExpired,
+    #[msg("Call ExpireWSol Instruction")]
+    ExpireWSolInstruction,
 }
