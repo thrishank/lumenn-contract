@@ -17,7 +17,7 @@ use anchor_spl::{
 
 use crate::{
     error::CustomError,
-    instructions::CancelOrderParams,
+    instructions::{CancelOrderParams, OrderCancelled},
     state::{EscrowAccount, Tokens},
     utils::{expected_accounts, validate_light_accounts, LightAccountSet},
     ATA_CREATION_AMOUNT,
@@ -205,28 +205,16 @@ pub fn expire<'info>(
         &temp_signer_seeds,
     ))?;
 
-    emit!(ExpireOrderEvent {
-        escrow_account: escrow_addrees,
+    emit!(OrderCancelled {
+        escrow_addrees,
         maker: ctx.accounts.maker.key(),
         input_mint: ctx.accounts.sol_mint.key(),
         output_mint: ctx.accounts.output_mint.key(),
         unique_id: escrow_account.unique_id,
-        amount: escrow_account.amount.making_amount,
-        expired_at: escrow_account.expired_at,
-        closed_at: current_timestamp,
+        is_expired: true,
+        cancelled_by: ctx.accounts.payer.key(),
+        timestamp: escrow_account.expired_at,
     });
 
     Ok(())
-}
-
-#[event]
-pub struct ExpireOrderEvent {
-    pub escrow_account: Pubkey,
-    pub maker: Pubkey,
-    pub input_mint: Pubkey,
-    pub output_mint: Pubkey,
-    pub unique_id: u64,
-    pub amount: u64,
-    pub expired_at: i64,
-    pub closed_at: i64,
 }
