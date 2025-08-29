@@ -17,9 +17,13 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { create_ata, create_ata_wsol } from "./create_ata";
 import { fill, fill_wsol } from "./fill";
 import { expire, expire_wsol } from "./expire";
+import * as dotenv from "dotenv";
+dotenv.config();
 
-export const payer = new Keypair();
 const connection = new Connection("https://api.devnet.solana.com");
+
+const secret = JSON.parse(process.env.KEY!);
+export const payer = Keypair.fromSecretKey(Uint8Array.from(secret));
 
 const provider = new AnchorProvider(connection, new Wallet(payer), {});
 export const program = new Program<Elara>(IDL as Elara, provider);
