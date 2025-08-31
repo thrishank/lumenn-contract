@@ -18,6 +18,7 @@ import { create_ata, create_ata_wsol } from "./create_ata";
 import { fill, fill_wsol } from "./fill";
 import { expire, expire_wsol } from "./expire";
 import * as dotenv from "dotenv";
+
 dotenv.config();
 
 const connection = new Connection("https://api.devnet.solana.com");
@@ -36,6 +37,8 @@ export const rpc = createRpc(url, url, url);
 export const SOL_MINT = new PublicKey(
   "So11111111111111111111111111111111111111112"
 );
+
+// PROD: https://claude.ai/chat/5f0f0170-f2eb-4746-a1a0-598e173dad16
 
 const app = express();
 
@@ -84,7 +87,7 @@ app.get("/fill", async (req, res) => {
 
   const ata_exist = await rpc.getAccountInfo(ata);
 
-  if (!ata_exist && escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+  if (!ata_exist && !escrow_data.tokens.outputMint.equals(SOL_MINT)) {
     if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
       await create_ata_wsol(address);
       // TODO: add ata creation confirmation
@@ -181,7 +184,7 @@ app.get("/expired", async (req, res) => {
 
   const ata_exist = await rpc.getAccountInfo(ata);
 
-  if (!ata_exist && escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+  if (!ata_exist && !escrow_data.tokens.outputMint.equals(SOL_MINT)) {
     if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
       await create_ata_wsol(address);
     } else {

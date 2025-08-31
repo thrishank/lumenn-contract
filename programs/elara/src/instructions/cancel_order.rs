@@ -166,7 +166,7 @@ pub fn cancel<'info>(
         crate::LIGHT_CPI_SIGNER,
     );
 
-    let escrow_addrees =
+    let escrow_address =
         Pubkey::new_from_array((*escrow.address()).expect("Address should be valid"));
 
     let cpi_inputs = CpiInputs::new(
@@ -200,11 +200,13 @@ pub fn cancel<'info>(
     )?;
 
     emit!(OrderCancelled {
-        escrow_addrees,
+        escrow_address,
         maker: ctx.accounts.maker.key(),
         unique_id: escrow_account.unique_id,
         input_mint: ctx.accounts.input_mint.key(),
         output_mint: ctx.accounts.output_mint.key(),
+        making_amount: escrow_account.amount.making_amount,
+        taking_amount: escrow_account.amount.taking_amount,
         is_expired,
         cancelled_by: ctx.accounts.payer.key(),
         timestamp: Clock::get()?.unix_timestamp,
@@ -215,11 +217,13 @@ pub fn cancel<'info>(
 
 #[event]
 pub struct OrderCancelled {
-    pub escrow_addrees: Pubkey,
+    pub escrow_address: Pubkey,
     pub maker: Pubkey,
     pub unique_id: u64,
     pub input_mint: Pubkey,
     pub output_mint: Pubkey,
+    pub making_amount: u64,
+    pub taking_amount: u64,
     pub is_expired: bool,
     pub cancelled_by: Pubkey,
     pub timestamp: i64,

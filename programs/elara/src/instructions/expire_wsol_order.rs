@@ -149,7 +149,7 @@ pub fn expire<'info>(
         crate::LIGHT_CPI_SIGNER,
     );
 
-    let escrow_addrees =
+    let escrow_address =
         Pubkey::new_from_array((*escrow.address()).expect("Address should be valid"));
 
     let cpi_inputs = CpiInputs::new(
@@ -206,10 +206,12 @@ pub fn expire<'info>(
     ))?;
 
     emit!(OrderCancelled {
-        escrow_addrees,
+        escrow_address,
         maker: ctx.accounts.maker.key(),
         input_mint: ctx.accounts.sol_mint.key(),
         output_mint: ctx.accounts.output_mint.key(),
+        making_amount: escrow_account.amount.making_amount,
+        taking_amount: escrow_account.amount.taking_amount,
         unique_id: escrow_account.unique_id,
         is_expired: true,
         cancelled_by: ctx.accounts.payer.key(),
