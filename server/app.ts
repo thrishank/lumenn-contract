@@ -18,13 +18,34 @@ import { create_ata, create_ata_wsol } from "./create_ata";
 import { fill, fill_wsol } from "./fill";
 import { expire, expire_wsol } from "./expire";
 import * as dotenv from "dotenv";
+import {
+  errorHandler,
+  logger,
+  metrics,
+  requestLogger,
+  retryOperation,
+} from "./utils";
 
 dotenv.config();
 
+if (!process.env.KEY) {
+  logger.error("Missing required environment variable: KEY");
+  process.exit(1);
+}
+
 const connection = new Connection("https://api.devnet.solana.com");
 
-const secret = JSON.parse(process.env.KEY!);
-export const payer = Keypair.fromSecretKey(Uint8Array.from(secret));
+export let payer: Keypair;
+try {
+  const secret = JSON.parse(process.env.KEY!);
+  payer = Keypair.fromSecretKey(Uint8Array.from(secret));
+  logger.info("Payer initialized", { publicKey: payer.publicKey.toString() });
+} catch (error) {
+  logger.error("Failed to initialize payer keypair", {
+    error: (error as Error).message,
+  });
+  process.exit(1);
+}
 
 const provider = new AnchorProvider(connection, new Wallet(payer), {});
 export const program = new Program<Elara>(IDL as Elara, provider);
@@ -38,170 +59,367 @@ export const SOL_MINT = new PublicKey(
   "So11111111111111111111111111111111111111112"
 );
 
-// PROD: https://claude.ai/chat/5f0f0170-f2eb-4746-a1a0-598e173dad16
-
 const app = express();
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+app.use(requestLogger);
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-app.get("/fill", async (req, res) => {
-  let { order, fill_type } = req.query;
-
-  if (!order) {
-    return res.status(400).json({ error: "Missing address parameter" });
-  }
-
-  if (fill_type && fill_type !== "partial" && fill_type !== "full") {
-    return res.status(400).json({ error: "Invalid fill_type parameter" });
-  }
-
-  let address: PublicKey;
+app.get("/health", async (req, res) => {
   try {
-    address = new PublicKey(order);
-  } catch (e) {
-    return res.status(400).json({ error: "Invalid order not a publickey" });
+    // Quick health checks
+    await Promise.race([
+      connection.getSlot(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 5000)
+      ),
+    ]);
+
+    const health = {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      metrics,
+    };
+
+    res.json(health);
+  } catch (error) {
+    logger.error("Health check failed", { error: (error as Error).message });
+    res.status(503).json({
+      status: "unhealthy",
+      timestamp: new Date().toISOString(),
+      error: (error as Error).message,
+    });
   }
-
-  let compressed_account = await rpc.getCompressedAccount(
-    bn(address.toBytes())
-  );
-
-  const buffer = compressed_account?.data?.data!;
-  const escrow_data = parseEscrowFromBuffer(buffer);
-
-  let hash = compressed_account.hash;
-
-  let proof = await rpc.getValidityProofV0(
-    [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
-    []
-  );
-
-  const ata = await getAssociatedTokenAddress(
-    escrow_data.tokens.outputMint,
-    escrow_data.maker
-  );
-
-  const ata_exist = await rpc.getAccountInfo(ata);
-
-  if (!ata_exist && !escrow_data.tokens.outputMint.equals(SOL_MINT)) {
-    if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
-      await create_ata_wsol(address);
-      // TODO: add ata creation confirmation
-    } else {
-      await create_ata(address);
-    }
-  }
-
-  // TODO: if parital then swap should be ExactOut
-
-  const { inAmount, outAmount, instruction_data, accounts, alt } =
-    await get_swap_instruction(
-      escrow_data.tokens.inputMint.toString(),
-      escrow_data.tokens.outputMint.toString(),
-      escrow_data.amount.makingAmount.toNumber(),
-      "ExactIn"
-    );
-
-  if (escrow_data.amount.takingAmount > outAmount) {
-    return res.status(400).json("taking amount less than expected");
-  }
-
-  if (escrow_data.amount.makingAmount != inAmount) {
-    return res.status(400).json("making amount not equal to input amount");
-  }
-
-  let tx: VersionedTransaction;
-
-  if (escrow_data.tokens.outputMint.equals(SOL_MINT)) {
-    tx = await fill_wsol(
-      compressed_account,
-      escrow_data,
-      proof,
-      fill_type === "partial" ? "partial" : "full",
-      instruction_data,
-      accounts,
-      alt
-    );
-  } else {
-    tx = await fill(
-      compressed_account,
-      escrow_data,
-      proof,
-      fill_type === "partial" ? "partial" : "full",
-      instruction_data,
-      accounts,
-      alt
-    );
-  }
-
-  tx.sign([payer]);
-
-  const sig = await rpc.sendTransaction(tx);
-  return res.status(200).json({ sig });
 });
 
-app.get("/expired", async (req, res) => {
-  let { order } = req.query;
+app.get("/metrics", (req, res) => {
+  res.json({
+    ...metrics,
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
 
-  if (!order) {
-    return res.status(400).json({ error: "Missing address parameter" });
-  }
+app.get(
+  "/fill",
+  async (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    const { requestId, startTime } = res.locals;
 
-  let address: PublicKey;
-  try {
-    address = new PublicKey(order);
-  } catch (e) {
-    return res.status(400).json({ error: "Invalid order not a publickey" });
-  }
+    try {
+      let { order, fill_type } = req.query;
 
-  let compressed_account = await rpc.getCompressedAccount(
-    bn(address.toBytes())
-  );
+      logger.info("Fill request started", { requestId, order, fill_type });
 
-  let hash = compressed_account.hash;
+      if (!order) {
+        throw new Error("Missing order parameter");
+      }
 
-  let proof = await rpc.getValidityProofV0(
-    [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
-    []
-  );
+      if (fill_type && fill_type !== "partial" && fill_type !== "full") {
+        throw new Error(
+          "Invalid fill_type parameter. Must be 'partial' or 'full'"
+        );
+      }
 
-  const buffer = compressed_account?.data?.data!;
+      let address: PublicKey;
+      try {
+        address = new PublicKey(order as string);
+      } catch (e) {
+        throw new Error("Invalid order address - not a valid PublicKey");
+      }
 
-  const escrow_data = parseEscrowFromBuffer(buffer);
+      const compressed_account = await retryOperation(
+        () => rpc.getCompressedAccount(bn(address.toBytes())),
+        3,
+        1000,
+        "getCompressedAccount"
+      );
 
-  if (escrow_data.expiredAt.toNumber() > Date.now()) {
-    throw new Error("Escrow not expired yet");
-  }
+      if (!compressed_account?.data?.data) {
+        throw new Error("Compressed account not found or has no data");
+      }
 
-  const ata = await getAssociatedTokenAddress(
-    escrow_data.tokens.outputMint,
-    escrow_data.maker
-  );
+      const buffer = compressed_account?.data?.data!;
+      const escrow_data = parseEscrowFromBuffer(buffer);
 
-  const ata_exist = await rpc.getAccountInfo(ata);
+      const expiredAt = new Date(escrow_data.expiredAt.toNumber() * 1000);
 
-  if (!ata_exist && !escrow_data.tokens.outputMint.equals(SOL_MINT)) {
-    if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
-      await create_ata_wsol(address);
-    } else {
-      await create_ata(address);
+      logger.info("Escrow data parsed", {
+        requestId,
+        maker: escrow_data.maker.toString(),
+        inputMint: escrow_data.tokens.inputMint.toString(),
+        outputMint: escrow_data.tokens.outputMint.toString(),
+        makingAmount: escrow_data.amount.makingAmount.toNumber(),
+        takingAmount: escrow_data.amount.takingAmount.toNumber(),
+        expiredAt: expiredAt.toISOString(),
+      });
+
+      if (escrow_data.expiredAt.toNumber() * 1000 <= Date.now()) {
+        throw new Error("Order has expired");
+      }
+
+      let hash = compressed_account.hash;
+
+      let proof = await rpc.getValidityProofV0(
+        [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
+        []
+      );
+
+      const ata = await getAssociatedTokenAddress(
+        escrow_data.tokens.outputMint,
+        escrow_data.maker
+      );
+
+      const ata_exist = await rpc.getAccountInfo(ata);
+
+      if (!ata_exist && !escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+        logger.info("Creating ATA for maker", {
+          requestId,
+          ata: ata.toString(),
+        });
+
+        if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
+          await create_ata_wsol(address);
+        } else {
+          await create_ata(address);
+        }
+
+        // Verify ATA was created
+        const ataVerification = await rpc.getAccountInfo(ata, "processed");
+        if (!ataVerification) {
+          throw new Error("Failed to create ATA for maker");
+        }
+
+        logger.info("ATA created successfully", { requestId });
+      }
+
+      // TODO: if parital then swap should be ExactOut
+      // fix the logic in the program
+
+      const { inAmount, outAmount, instruction_data, accounts, alt } =
+        await get_swap_instruction(
+          escrow_data.tokens.inputMint.toString(),
+          escrow_data.tokens.outputMint.toString(),
+          escrow_data.amount.makingAmount.toNumber(),
+          "ExactIn"
+        );
+
+      logger.info("Swap instruction received", {
+        requestId,
+        inAmount,
+        outAmount,
+        accountsCount: accounts.length,
+      });
+
+      if (escrow_data.amount.takingAmount.toNumber() > outAmount) {
+        throw new Error(
+          `Required Taking amount (${escrow_data.amount.takingAmount.toNumber()}) Expected: (${outAmount})`
+        );
+      }
+
+      if (escrow_data.amount.makingAmount.toNumber() !== inAmount) {
+        throw new Error(
+          `Making amount (${escrow_data.amount.makingAmount.toNumber()}) does not match input amount (${inAmount})`
+        );
+      }
+
+      let tx: VersionedTransaction;
+
+      if (escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+        tx = await fill_wsol(
+          compressed_account,
+          escrow_data,
+          proof,
+          fill_type === "partial" ? "partial" : "full",
+          instruction_data,
+          accounts,
+          alt
+        );
+      } else {
+        tx = await fill(
+          compressed_account,
+          escrow_data,
+          proof,
+          fill_type === "partial" ? "partial" : "full",
+          instruction_data,
+          accounts,
+          alt
+        );
+      }
+
+      tx.sign([payer]);
+
+      const sig = await rpc.sendTransaction(tx);
+      const responseTime = performance.now() - startTime;
+
+      metrics.successfulFills++;
+
+      logger.info("Fill transaction successful", {
+        requestId,
+        sig,
+        responseTime: `${responseTime.toFixed(2)}ms`,
+        order: address.toString(),
+        fillType: fill_type || "full",
+      });
+      return res.status(200).json({ sig });
+    } catch (error) {
+      metrics.failedFills++;
+      next(error);
     }
   }
+);
 
-  let tx: VersionedTransaction;
+app.get(
+  "/expired",
+  async (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    const { requestId, startTime } = res.locals;
+    try {
+      let { order } = req.query;
 
-  if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
-    tx = await expire_wsol(compressed_account, escrow_data, proof);
-  } else {
-    tx = await expire(compressed_account, escrow_data, proof);
+      logger.info("Expire request started", { requestId, order });
+
+      if (!order) {
+        throw new Error("Missing order parameter");
+      }
+
+      let address: PublicKey;
+      try {
+        address = new PublicKey(order as string);
+      } catch (e) {
+        throw new Error("Invalid order address - not a valid PublicKey");
+      }
+
+      const compressed_account = await retryOperation(
+        () => rpc.getCompressedAccount(bn(address.toBytes())),
+        3,
+        1000,
+        "getCompressedAccount"
+      );
+
+      if (!compressed_account?.data?.data) {
+        throw new Error("Compressed account not found or has no data");
+      }
+
+      let hash = compressed_account.hash;
+
+      let proof = await rpc.getValidityProofV0(
+        [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
+        []
+      );
+
+      const buffer = compressed_account?.data?.data!;
+
+      const escrow_data = parseEscrowFromBuffer(buffer);
+
+      logger.info("Escrow data for expiry", {
+        requestId,
+        maker: escrow_data.maker.toString(),
+        expiredAt: new Date(
+          escrow_data.expiredAt.toNumber() * 1000
+        ).toISOString(),
+        isExpired: escrow_data.expiredAt.toNumber() <= Date.now(),
+      });
+
+      if (escrow_data.expiredAt.toNumber() * 1000 > Date.now()) {
+        const timeUntilExpiry =
+          escrow_data.expiredAt.toNumber() * 1000 - Date.now();
+        throw new Error(
+          `Escrow not expired yet. Time remaining: ${Math.floor(
+            timeUntilExpiry / 1000
+          )}s`
+        );
+      }
+
+      const ata = await getAssociatedTokenAddress(
+        escrow_data.tokens.outputMint,
+        escrow_data.maker
+      );
+
+      const ata_exist = await rpc.getAccountInfo(ata);
+
+      if (!ata_exist && !escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+        logger.info("Creating ATA for expired order", { requestId });
+
+        if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
+          await create_ata_wsol(address);
+        } else {
+          await create_ata(address);
+        }
+      }
+
+      let tx: VersionedTransaction;
+
+      if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
+        tx = await expire_wsol(compressed_account, escrow_data, proof);
+      } else {
+        tx = await expire(compressed_account, escrow_data, proof);
+      }
+
+      tx.sign([payer]);
+
+      const signature = await rpc.sendTransaction(tx);
+
+      const responseTime = performance.now() - startTime;
+
+      metrics.successfulExpires++;
+
+      logger.info("Expire transaction successful", {
+        requestId,
+        signature,
+        responseTime: `${responseTime.toFixed(2)}ms`,
+        order: address.toString(),
+      });
+
+      return res.status(200).json({ signature });
+    } catch (error) {
+      metrics.failedExpires++;
+      next(error);
+    }
   }
+);
 
-  tx.sign([payer]);
+app.use(errorHandler);
 
-  const signature = await rpc.sendTransaction(tx);
-  return res.status(200).json({ signature });
+const gracefulShutdown = (signal: string) => {
+  logger.info(`Received ${signal}, shutting down gracefully`);
+  process.exit(0);
+};
+
+process.on("SIGTERM", gracefulShutdown);
+process.on("SIGINT", gracefulShutdown);
+
+// Log unhandled errors
+process.on("unhandledRejection", (reason, promise) => {
+  logger.error("Unhandled Promise Rejection", { reason, promise });
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught Exception", {
+    error: error.message,
+    stack: error.stack,
+  });
+  process.exit(1);
+});
+
+const server = app.listen(3000, "127.0.0.1", () => {
+  logger.info("Elara Trading Server started", {
+    port: 3000,
+    environment: process.env.NODE_ENV || "development",
+    nodeVersion: process.version,
+  });
+});
+
+server.on("error", (error) => {
+  logger.error("Server error", { error: error.message });
 });
