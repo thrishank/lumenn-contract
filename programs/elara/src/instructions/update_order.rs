@@ -242,10 +242,12 @@ fn light_cpi<'info>(
 
     if let Some(ma) = args.making_amount {
         escrow.amount.making_amount = ma;
+        escrow.amount.ori_making_amount = ma;
     }
 
     if let Some(ta) = args.taking_amount {
         escrow.amount.taking_amount = ta;
+        escrow.amount.ori_taking_amount = ta;
     }
 
     if let Some(exp) = args.expired_at {
