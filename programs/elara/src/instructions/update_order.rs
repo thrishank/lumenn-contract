@@ -93,14 +93,18 @@ pub fn update<'info>(
     if let Some(ma) = args.making_amount {
         require!(ma > 0, CustomError::InvalidAmount);
     }
+
     if let Some(ta) = args.taking_amount {
         require!(ta > 0, CustomError::InvalidAmount);
     }
+
     if let Some(exp) = args.expired_at {
-        require!(
-            exp > Clock::get()?.unix_timestamp,
-            CustomError::InvalidExpiration
-        );
+        if exp != 0 {
+            require!(
+                exp > Clock::get()?.unix_timestamp,
+                CustomError::InvalidExpiration
+            );
+        }
     }
 
     let escrow_address = light_cpi(&ctx, ctx.remaining_accounts, &args)?;
