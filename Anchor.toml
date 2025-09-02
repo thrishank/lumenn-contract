@@ -16,10 +16,11 @@ cluster = "Devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
+test-init = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/init.test.ts"
 test-cancel = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/cancel.test.ts"
 test-expire = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/expire.test.ts"
+test-update = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/update.test.ts"
 test-ata = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/ata.test.ts"
-test-init = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/init.test.ts"
 test-fill = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/fill.test.ts"
 test-partial = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/partial-fill.test.ts"
 test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

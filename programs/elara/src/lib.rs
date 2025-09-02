@@ -70,6 +70,16 @@ pub mod elara {
         expire_wsol_order::expire(ctx, args)
     }
 
+    /// Update an existing order, change the making and taking amount
+    /// change the expiry time
+    /// NOTE: no need a new instruction for wsol as this is signed by the payer itself
+    pub fn update_order<'info>(
+        ctx: Context<'_, '_, '_, 'info, UpdateOrder<'info>>,
+        args: UpdateOrderArgs,
+    ) -> Result<()> {
+        update_order::update(ctx, args)
+    }
+
     /// To send the output tokens to the maker, maker needs to have an associated token account
     /// usallay created when initializing the order but if they close we create it
     /// take samll amount from the making amount and swap it wSOL and send it to the payer

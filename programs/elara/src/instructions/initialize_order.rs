@@ -76,6 +76,22 @@ pub struct InitializeOrder<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct InitializeOrderParams {
+    pub unique_id: u64,
+    pub making_amount: u64,
+    pub taking_amount: u64,
+    pub expired_at: Option<i64>,
+    pub slippage_bps: u16,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct LightArgs {
+    pub proof: ValidityProof,
+    pub address_tree_info: PackedAddressTreeInfo,
+    pub output_state_tree_index: u8,
+}
+
 pub fn init<'info>(
     ctx: Context<'_, '_, '_, 'info, InitializeOrder<'info>>,
     order_args: InitializeOrderParams,
@@ -189,22 +205,6 @@ pub fn init<'info>(
     });
 
     Ok(())
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
-pub struct InitializeOrderParams {
-    pub unique_id: u64,
-    pub making_amount: u64,
-    pub taking_amount: u64,
-    pub expired_at: Option<i64>,
-    pub slippage_bps: u16,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
-pub struct LightArgs {
-    pub proof: ValidityProof,
-    pub address_tree_info: PackedAddressTreeInfo,
-    pub output_state_tree_index: u8,
 }
 
 #[event]

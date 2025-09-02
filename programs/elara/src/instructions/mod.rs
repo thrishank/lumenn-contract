@@ -18,3 +18,6 @@ pub use fill_wsol_order::*;
 
 pub mod fill_order;
 pub use fill_order::*;
+
+pub mod update_order;
+pub use update_order::*;
