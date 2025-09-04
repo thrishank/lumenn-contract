@@ -108,7 +108,6 @@ describe("elara/expire_order", () => {
       return;
     }
     const takingAmount = new BN(1_000_000_000);
-    const slippageBps = 50; // 0.5%
 
     const wSOL_ata = await getAssociatedTokenAddress(sol_mint, maker.publicKey);
     const now = Math.floor(Date.now() / 1000);
@@ -119,8 +118,7 @@ describe("elara/expire_order", () => {
           uniqueId: unique_id,
           makingAmount,
           takingAmount,
-          expiredAt: new BN(now + 5),
-          slippageBps,
+          expiredAt: new BN(now + 3),
         },
         {
           proof: {
@@ -208,7 +206,6 @@ describe("elara/expire_order", () => {
             oriTakingAmount: escrow_data.amount.oriTakingAmount,
           },
           expiredAt: escrow_data.expiredAt,
-          slippageBps: escrow_data.slippageBps,
           feeBps: escrow_data.feeBps,
           createdAt: escrow_data.createdAt,
           updatedAt: escrow_data.updatedAt,

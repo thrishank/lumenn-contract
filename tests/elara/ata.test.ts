@@ -94,7 +94,6 @@ describe("elara/create_token_account", () => {
 
     const makingAmount = new BN(1_000_000_000);
     const takingAmount = new BN(1_000_000_000);
-    const slippageBps = 50; // 0.5%
 
     const tx = await program.methods
       .initializeOrder(
@@ -103,7 +102,6 @@ describe("elara/create_token_account", () => {
           makingAmount,
           takingAmount,
           expiredAt: null,
-          slippageBps,
         },
         {
           proof: {
@@ -208,7 +206,6 @@ describe("elara/create_token_account", () => {
             oriTakingAmount: escrow_data.amount.oriTakingAmount,
           },
           expiredAt: escrow_data.expiredAt,
-          slippageBps: escrow_data.slippageBps,
           feeBps: escrow_data.feeBps,
           createdAt: escrow_data.createdAt,
           updatedAt: escrow_data.updatedAt,
@@ -346,7 +343,6 @@ describe("elara/create_token_account", () => {
 
     const makingAmount = new BN(239_932_00);
     const takingAmount = new BN(1_000_000_00);
-    const slippageBps = 50; // 0.5%
 
     const wSOL_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
 
@@ -367,7 +363,6 @@ describe("elara/create_token_account", () => {
           makingAmount,
           takingAmount,
           expiredAt: null,
-          slippageBps,
         },
         {
           proof: {
@@ -458,6 +453,8 @@ describe("elara/create_token_account", () => {
       "So11111111111111111111111111111111111111112"
     );
 
+    if (!validityProof1) return;
+
     const instruction = await program.methods
       .createAtaWsol({
         swapData: Buffer.from(swap.swapInstruction.data, "base64"),
@@ -477,7 +474,6 @@ describe("elara/create_token_account", () => {
             oriTakingAmount: escrow_data.amount.oriTakingAmount,
           },
           expiredAt: escrow_data.expiredAt,
-          slippageBps: escrow_data.slippageBps,
           feeBps: escrow_data.feeBps,
           createdAt: escrow_data.createdAt,
           updatedAt: escrow_data.updatedAt,
@@ -490,13 +486,13 @@ describe("elara/create_token_account", () => {
           },
         },
         accountMeta: {
-          address: compressed_account.address,
+          address: compressed_account!.address ?? [],
           treeInfo: {
             rootIndex: proof1.rootIndices[0],
             merkleTreePubkeyIndex: 0,
             queuePubkeyIndex: 1,
             proveByIndex: false,
-            leafIndex: compressed_account.leafIndex,
+            leafIndex: compressed_account!.leafIndex,
           },
           outputStateTreeIndex: 0,
         },

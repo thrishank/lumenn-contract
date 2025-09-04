@@ -17,7 +17,6 @@ export async function assertEscrowState({
   outputMint,
   makingAmount,
   takingAmount,
-  slippageBps = 50, // default
 }: {
   rpc: ReturnType<typeof import("@lightprotocol/stateless.js")["createRpc"]>;
   address: PublicKey;
@@ -27,7 +26,6 @@ export async function assertEscrowState({
   outputMint: PublicKey;
   makingAmount: BN;
   takingAmount: BN;
-  slippageBps?: number;
 }) {
   const account = await rpc.getCompressedAccount(bn(address.toBytes()));
   assert.isDefined(account, "Compressed Account not found");
@@ -75,8 +73,6 @@ export async function assertEscrowState({
     data.amount.takingAmount.eq(takingAmount),
     "takingAmount mismatch"
   );
-
-  assert.equal(data.slippageBps, slippageBps, "slippageBps mismatch");
 }
 
 export async function assertEscrowDoesNotExist({

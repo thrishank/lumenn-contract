@@ -1,4 +1,3 @@
-import { Escrow } from "../tests/utils/fn";
 import {
   CompressedAccountWithMerkleContext,
   ValidityProofWithContext,
@@ -12,6 +11,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { CLOSE_ACCOUNTS } from "../tests/utils/address";
+import { Escrow } from "../tests/utils/fn";
 
 export async function fill(
   compressed_account: CompressedAccountWithMerkleContext,
@@ -36,7 +36,6 @@ export async function fill(
           oriTakingAmount: escrow_data.amount.oriTakingAmount,
         },
         expiredAt: escrow_data.expiredAt,
-        slippageBps: escrow_data.slippageBps,
         feeBps: escrow_data.feeBps,
         createdAt: escrow_data.createdAt,
         updatedAt: escrow_data.updatedAt,
@@ -121,7 +120,6 @@ export async function fill_wsol(
           oriTakingAmount: escrow_data.amount.oriTakingAmount,
         },
         expiredAt: escrow_data.expiredAt,
-        slippageBps: escrow_data.slippageBps,
         feeBps: escrow_data.feeBps,
         createdAt: escrow_data.createdAt,
         updatedAt: escrow_data.updatedAt,

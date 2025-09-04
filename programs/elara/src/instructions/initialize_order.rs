@@ -82,7 +82,6 @@ pub struct InitializeOrderParams {
     pub making_amount: u64,
     pub taking_amount: u64,
     pub expired_at: Option<i64>,
-    pub slippage_bps: u16,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -199,7 +198,6 @@ pub fn init<'info>(
         output_mint_decimals: ctx.accounts.output_mint.decimals,
         making_amount: order_args.making_amount,
         taking_amount: order_args.taking_amount,
-        slippage_bps: order_args.slippage_bps,
         expired_at: order_args.expired_at.unwrap_or(0),
     });
 
@@ -217,6 +215,5 @@ pub struct OrderInitialized {
     pub output_mint_decimals: u8,
     pub making_amount: u64,
     pub taking_amount: u64,
-    pub slippage_bps: u16,
     pub expired_at: i64,
 }

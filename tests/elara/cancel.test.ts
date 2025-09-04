@@ -88,7 +88,6 @@ describe("elara/cancel_order", () => {
 
     const makingAmount = new BN(1_000_000_000);
     const takingAmount = new BN(1_000_000_000);
-    const slippageBps = 50; // 0.5%
 
     const tx = await program.methods
       .initializeOrder(
@@ -97,7 +96,6 @@ describe("elara/cancel_order", () => {
           makingAmount,
           takingAmount,
           expiredAt: null,
-          slippageBps,
         },
         {
           proof: {
@@ -191,7 +189,6 @@ describe("elara/cancel_order", () => {
             oriTakingAmount: escrow_data.amount.oriTakingAmount,
           },
           expiredAt: escrow_data.expiredAt,
-          slippageBps: escrow_data.slippageBps,
           feeBps: escrow_data.feeBps,
           createdAt: escrow_data.createdAt,
           updatedAt: escrow_data.updatedAt,
@@ -292,7 +289,6 @@ describe("elara/cancel_order", () => {
 
     const makingAmount = new BN(239_932);
     const takingAmount = new BN(1_000_000_00);
-    const slippageBps = 50; // 0.5%
 
     const wSOL_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
 
@@ -313,7 +309,6 @@ describe("elara/cancel_order", () => {
           makingAmount,
           takingAmount,
           expiredAt: null,
-          slippageBps,
         },
         {
           proof: {
@@ -415,7 +410,6 @@ describe("elara/cancel_order", () => {
             oriTakingAmount: escrow_data.amount.oriTakingAmount,
           },
           expiredAt: escrow_data.expiredAt,
-          slippageBps: escrow_data.slippageBps,
           feeBps: escrow_data.feeBps,
           createdAt: escrow_data.createdAt,
           updatedAt: escrow_data.updatedAt,
@@ -530,7 +524,6 @@ describe("elara/cancel_order", () => {
           makingAmount,
           takingAmount,
           expiredAt: null,
-          slippageBps: 50,
         },
         {
           proof: {
@@ -633,7 +626,6 @@ describe("elara/cancel_order", () => {
             oriTakingAmount: escrow_data.amount.oriTakingAmount,
           },
           expiredAt: escrow_data.expiredAt,
-          slippageBps: escrow_data.slippageBps,
           feeBps: escrow_data.feeBps,
           createdAt: escrow_data.createdAt,
           updatedAt: escrow_data.updatedAt,

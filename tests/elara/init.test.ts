@@ -110,7 +110,6 @@ describe("elara/init_order", () => {
 
     const makingAmount = new BN(1_000_000_000);
     const takingAmount = new BN(1_000_000_000);
-    const slippageBps = 50; // 0.5%
 
     const instruction = await program.methods
       .initializeOrder(
@@ -119,7 +118,6 @@ describe("elara/init_order", () => {
           makingAmount,
           takingAmount,
           expiredAt: new BN(123141242141),
-          slippageBps,
         },
         {
           proof: {
@@ -265,7 +263,6 @@ describe("elara/init_order", () => {
           makingAmount,
           takingAmount,
           expiredAt: null,
-          slippageBps: 50,
         },
         {
           proof: {

@@ -31,7 +31,6 @@ export type Escrow = {
   expiredAt: BN;
   createdAt: BN;
   updatedAt: BN;
-  slippageBps: number;
   feeBps: number;
 };
 
@@ -56,8 +55,7 @@ export function parseEscrowFromBuffer(buffer: Buffer): Escrow {
   const created_at = buffer.readBigInt64LE(208);
   const updated_at = buffer.readBigInt64LE(216);
 
-  const slippage_bps = buffer.readUInt16LE(224);
-  const fee_bps = buffer.readUInt16LE(226);
+  const fee_bps = buffer.readUInt16LE(224);
 
   return {
     maker: new PublicKey(maker_bytes),
@@ -74,7 +72,6 @@ export function parseEscrowFromBuffer(buffer: Buffer): Escrow {
       makingAmount: new BN(making_amount.toString()),
       takingAmount: new BN(taking_amount.toString()),
     },
-    slippageBps: Number(slippage_bps),
     feeBps: Number(fee_bps),
     expiredAt: new BN(expired_at.toString()),
     createdAt: new BN(created_at.toString()),
