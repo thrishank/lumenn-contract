@@ -13,7 +13,6 @@ pub struct EscrowAccount {
     pub expired_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
-    pub slippage_bps: u16,
     pub fee_bps: u16,
 }
 
@@ -47,7 +46,6 @@ pub struct Amount {
 pub struct AccountParams {
     pub unique_id: u64,
     pub amount: Amount,
-    pub slippage_bps: u16,
     pub fee_bps: u16,
     pub expired_at: i64,
     pub created_at: i64,

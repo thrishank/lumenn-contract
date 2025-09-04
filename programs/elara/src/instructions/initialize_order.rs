@@ -156,7 +156,6 @@ pub fn init<'info>(
     escrow.amount.ori_taking_amount = order_args.taking_amount;
     escrow.amount.making_amount = order_args.making_amount;
     escrow.amount.taking_amount = order_args.taking_amount;
-    escrow.slippage_bps = order_args.slippage_bps;
     escrow.fee_bps = 10;
     escrow.expired_at = order_args.expired_at.unwrap_or(0);
     escrow.created_at = Clock::get()?.unix_timestamp;

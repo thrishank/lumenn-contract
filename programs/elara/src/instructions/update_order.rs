@@ -173,7 +173,6 @@ pub fn update<'info>(
         taking_amount: args
             .taking_amount
             .unwrap_or(args.escrow_account.amount.taking_amount),
-        slippage_bps: args.escrow_account.slippage_bps,
         expired_at: args.expired_at.unwrap_or(args.escrow_account.expired_at),
     });
 
@@ -222,7 +221,6 @@ fn light_cpi<'info>(
                 output_token_program: ctx.accounts.output_token_program.key(),
             },
             amount: escrow_account.amount,
-            slippage_bps: escrow_account.slippage_bps,
             fee_bps: escrow_account.fee_bps,
             expired_at: escrow_account.expired_at,
             created_at: escrow_account.created_at,
@@ -289,6 +287,5 @@ pub struct OrderUpdateEvent {
     pub output_mint_decimals: u8,
     pub making_amount: u64,
     pub taking_amount: u64,
-    pub slippage_bps: u16,
     pub expired_at: i64,
 }

@@ -111,7 +111,7 @@ pub fn fill<'info>(
 
     let escrow_account = args.escrow_account;
 
-    if jup_data.slippage_bps > escrow_account.slippage_bps {
+    if jup_data.slippage_bps != 0 {
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
@@ -140,7 +140,7 @@ pub fn fill<'info>(
 
     match args.fill_type {
         FillType::Full => {
-            if jup_data.is_exact_out {
+            if !jup_data.is_exact_out {
                 return Err(error!(CustomError::InvalidJupInstructionData));
             }
 
@@ -212,7 +212,6 @@ pub fn fill<'info>(
                 unique_id: escrow_account.unique_id,
                 in_amount,
                 out_amount: escrow_account.amount.taking_amount,
-                slippage_bps: escrow_account.slippage_bps,
                 fee_bps: escrow_account.fee_bps,
                 fill_type: FillType::Full,
             });
@@ -288,7 +287,6 @@ pub fn fill<'info>(
                 unique_id: escrow_account.unique_id,
                 in_amount,
                 out_amount: escrow_account.amount.taking_amount,
-                slippage_bps: escrow_account.slippage_bps,
                 fee_bps: escrow_account.fee_bps,
                 fill_type: FillType::Partial,
             });
@@ -335,7 +333,6 @@ fn light_cpi_close<'info>(
                 output_token_program: ctx.accounts.output_token_program.key(),
             },
             amount: escrow_account.amount,
-            slippage_bps: escrow_account.slippage_bps,
             fee_bps: escrow_account.fee_bps,
             expired_at: escrow_account.expired_at,
             created_at: escrow_account.created_at,
@@ -414,7 +411,6 @@ pub fn light_cpi_update<'info>(
                 output_token_program: ctx.accounts.output_token_program.key(),
             },
             amount: escrow_account.amount,
-            slippage_bps: escrow_account.slippage_bps,
             fee_bps: escrow_account.fee_bps,
             expired_at: escrow_account.expired_at,
             created_at: escrow_account.created_at,

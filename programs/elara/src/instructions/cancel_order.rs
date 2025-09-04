@@ -108,7 +108,6 @@ pub fn cancel<'info>(
                 output_token_program: ctx.accounts.output_token_program.key(),
             },
             amount: escrow_account.amount,
-            slippage_bps: escrow_account.slippage_bps,
             fee_bps: escrow_account.fee_bps,
             expired_at: escrow_account.expired_at,
             created_at: escrow_account.created_at,
