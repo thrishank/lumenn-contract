@@ -12,7 +12,7 @@ import express from "express";
 import { bn, createRpc } from "@lightprotocol/stateless.js";
 import { ADDRESS_QUEUE, ADDRESS_TREE } from "../tests/utils/address";
 import { parseEscrowFromBuffer } from "../tests/utils/fn";
-import { get_swap_instruction } from "./jup";
+import { get_price, get_swap_instruction } from "./jup";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { create_ata, create_ata_wsol } from "./create_ata";
 import { fill, fill_wsol } from "./fill";
@@ -114,18 +114,16 @@ app.get(
     const { requestId, startTime } = res.locals;
 
     try {
-      let { order, fill_type } = req.query;
+      let { order, target_ratio } = req.query;
 
-      logger.info("Fill request started", { requestId, order, fill_type });
+      logger.info("Fill request started", { requestId, order, target_ratio });
 
       if (!order) {
         throw new Error("Missing order parameter");
       }
 
-      if (fill_type && fill_type !== "partial" && fill_type !== "full") {
-        throw new Error(
-          "Invalid fill_type parameter. Must be 'partial' or 'full'"
-        );
+      if (!target_ratio) {
+        throw new Error("Missing target_ratio parameter");
       }
 
       let address: PublicKey;
@@ -163,6 +161,79 @@ app.get(
 
       if (escrow_data.expiredAt.toNumber() * 1000 <= Date.now()) {
         throw new Error("Order has expired");
+      }
+
+      let fill_type: "full" | "partial" = "full";
+
+      let tryInAmount = escrow_data.amount.makingAmount.toNumber();
+      let tryTakingAmount = escrow_data.amount.takingAmount.toNumber();
+
+      let finalInstructionData: any = null;
+      let finalAccounts: any[] = [];
+      let finalAlt: any[] = [];
+
+      let price_check = true;
+
+      while (tryInAmount > 0 && tryTakingAmount > 0) {
+        const {
+          inAmount,
+          outAmount,
+          priceImpactPct,
+          instruction_data,
+          accounts,
+          alt,
+        } = await get_swap_instruction(
+          escrow_data.tokens.inputMint.toString(),
+          escrow_data.tokens.outputMint.toString(),
+          tryInAmount,
+          "ExactIn"
+        );
+
+        logger.info("Swap trial", {
+          requestId,
+          inAmount,
+          outAmount,
+          priceImpactPct,
+          accountsCount: accounts.length,
+          altCount: alt.length,
+        });
+
+        if (outAmount >= escrow_data.amount.takingAmount.toNumber()) {
+          fill_type = "full";
+          finalInstructionData = instruction_data;
+          finalAccounts = accounts;
+          finalAlt = alt;
+          break;
+        }
+
+        if (price_check) {
+          price_check = false;
+          const { current_ratio } = await get_price(
+            escrow_data.tokens.inputMint.toString(),
+            escrow_data.tokens.outputMint.toString()
+          );
+
+          if (Number(target_ratio) > current_ratio) {
+            throw new Error(
+              `Target Ratio: ${target_ratio} is greater than current market ratio: ${current_ratio} `
+            );
+          }
+        }
+
+        if (outAmount >= tryTakingAmount) {
+          fill_type = "partial";
+          finalInstructionData = instruction_data;
+          finalAccounts = accounts;
+          finalAlt = alt;
+          break;
+        }
+
+        tryInAmount = Math.floor(tryInAmount / 2);
+        tryTakingAmount = Math.floor(tryTakingAmount / 2);
+      }
+
+      if (!finalInstructionData) {
+        throw new Error("Swap Quote not found to fill the order");
       }
 
       let hash = compressed_account.hash;
@@ -203,33 +274,6 @@ app.get(
       // TODO: if parital then swap should be ExactOut
       // fix the logic in the program
 
-      const { inAmount, outAmount, instruction_data, accounts, alt } =
-        await get_swap_instruction(
-          escrow_data.tokens.inputMint.toString(),
-          escrow_data.tokens.outputMint.toString(),
-          escrow_data.amount.makingAmount.toNumber(),
-          "ExactIn"
-        );
-
-      logger.info("Swap instruction received", {
-        requestId,
-        inAmount,
-        outAmount,
-        accountsCount: accounts.length,
-      });
-
-      if (escrow_data.amount.takingAmount.toNumber() > outAmount) {
-        throw new Error(
-          `Required Taking amount (${escrow_data.amount.takingAmount.toNumber()}) Expected: (${outAmount})`
-        );
-      }
-
-      if (escrow_data.amount.makingAmount.toNumber() !== inAmount) {
-        throw new Error(
-          `Making amount (${escrow_data.amount.makingAmount.toNumber()}) does not match input amount (${inAmount})`
-        );
-      }
-
       let tx: VersionedTransaction;
 
       if (escrow_data.tokens.outputMint.equals(SOL_MINT)) {
@@ -238,9 +282,9 @@ app.get(
           escrow_data,
           proof,
           fill_type === "partial" ? "partial" : "full",
-          instruction_data,
-          accounts,
-          alt
+          finalInstructionData,
+          finalAccounts,
+          finalAlt
         );
       } else {
         tx = await fill(
@@ -248,9 +292,9 @@ app.get(
           escrow_data,
           proof,
           fill_type === "partial" ? "partial" : "full",
-          instruction_data,
-          accounts,
-          alt
+          finalInstructionData,
+          finalAccounts,
+          finalAlt
         );
       }
 
