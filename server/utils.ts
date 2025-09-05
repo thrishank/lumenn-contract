@@ -1,7 +1,8 @@
-import express from "express";
-import winston from "winston";
 import fs from "fs";
 import path from "path";
+import express from "express";
+import winston from "winston";
+import tokensData from "./../tokens.json";
 
 const logsDir = path.join(process.cwd(), "logs");
 if (!fs.existsSync(logsDir)) {
@@ -174,3 +175,30 @@ export const retryOperation = async <T>(
   // This should never be reached, but TypeScript requires it
   throw lastError!;
 };
+
+interface Token {
+  id: string;
+  name: string;
+  symbol: string;
+  icon?: string;
+  decimals: number;
+  tokenProgram: string;
+}
+
+const tokens: Token[] = tokensData;
+
+export const tokenMap: Map<string, Token> = new Map(
+  tokens.map((t) => [t.id, t])
+);
+
+// TODO: how to handle if the token is not found ?
+export function caluclate_target_ratio(
+  making_amount: number,
+  taking_amount: number,
+  making_token: string,
+  taking_token: string
+) {
+  const taking = taking_amount / 10 ** tokenMap.get(taking_token).decimals;
+  const making = making_amount / 10 ** tokenMap.get(making_token).decimals;
+  return taking / making;
+}

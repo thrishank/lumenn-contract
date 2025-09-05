@@ -19,6 +19,7 @@ import { fill, fill_wsol } from "./fill";
 import { expire, expire_wsol } from "./expire";
 import * as dotenv from "dotenv";
 import {
+  caluclate_target_ratio,
   errorHandler,
   logger,
   metrics,
@@ -114,16 +115,13 @@ app.get(
     const { requestId, startTime } = res.locals;
 
     try {
-      let { order, target_ratio } = req.query;
+      // TODO: calculate the traget ratio from the order state
+      let { order } = req.query;
 
-      logger.info("Fill request started", { requestId, order, target_ratio });
+      logger.info("Fill request started", { requestId, order });
 
       if (!order) {
         throw new Error("Missing order parameter");
-      }
-
-      if (!target_ratio) {
-        throw new Error("Missing target_ratio parameter");
       }
 
       let address: PublicKey;
@@ -147,19 +145,22 @@ app.get(
       const buffer = compressed_account?.data?.data!;
       const escrow_data = parseEscrowFromBuffer(buffer);
 
-      const expiredAt = new Date(escrow_data.expiredAt.toNumber() * 1000);
+      const expiredAt = escrow_data.expiredAt.toNumber() * 1000;
+
+      const inputMint = escrow_data.tokens.inputMint;
+      const outputMint = escrow_data.tokens.outputMint;
 
       logger.info("Escrow data parsed", {
         requestId,
         maker: escrow_data.maker.toString(),
-        inputMint: escrow_data.tokens.inputMint.toString(),
-        outputMint: escrow_data.tokens.outputMint.toString(),
+        inputMint: inputMint.toString(),
+        outputMint: outputMint.toString(),
         makingAmount: escrow_data.amount.makingAmount.toNumber(),
         takingAmount: escrow_data.amount.takingAmount.toNumber(),
-        expiredAt: expiredAt.toISOString(),
+        expiredAt: new Date(expiredAt).toISOString(),
       });
 
-      if (escrow_data.expiredAt.toNumber() * 1000 <= Date.now()) {
+      if (expiredAt != 0 && expiredAt <= Date.now()) {
         throw new Error("Order has expired");
       }
 
@@ -175,6 +176,10 @@ app.get(
       let price_check = true;
 
       while (tryInAmount > 0 && tryTakingAmount > 0) {
+        const outputMint = new PublicKey(
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        );
+
         const {
           inAmount,
           outAmount,
@@ -183,13 +188,13 @@ app.get(
           accounts,
           alt,
         } = await get_swap_instruction(
-          escrow_data.tokens.inputMint.toString(),
-          escrow_data.tokens.outputMint.toString(),
+          inputMint.toString(),
+          outputMint.toString(),
           tryInAmount,
           "ExactIn"
         );
 
-        logger.info("Swap trial", {
+        logger.info("Swap Data", {
           requestId,
           inAmount,
           outAmount,
@@ -209,9 +214,18 @@ app.get(
         if (price_check) {
           price_check = false;
           const { current_ratio } = await get_price(
-            escrow_data.tokens.inputMint.toString(),
-            escrow_data.tokens.outputMint.toString()
+            inputMint.toString(),
+            outputMint.toString()
           );
+
+          const target_ratio = caluclate_target_ratio(
+            escrow_data.amount.makingAmount.toNumber(),
+            escrow_data.amount.takingAmount.toNumber(),
+            inputMint.toString(),
+            outputMint.toString()
+          );
+
+          console.log(target_ratio, current_ratio);
 
           if (Number(target_ratio) > current_ratio) {
             throw new Error(
@@ -250,13 +264,13 @@ app.get(
 
       const ata_exist = await rpc.getAccountInfo(ata);
 
-      if (!ata_exist && !escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+      if (!ata_exist && !outputMint.equals(SOL_MINT)) {
         logger.info("Creating ATA for maker", {
           requestId,
           ata: ata.toString(),
         });
 
-        if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
+        if (inputMint.equals(SOL_MINT)) {
           await create_ata_wsol(address);
         } else {
           await create_ata(address);
@@ -271,12 +285,9 @@ app.get(
         logger.info("ATA created successfully", { requestId });
       }
 
-      // TODO: if parital then swap should be ExactOut
-      // fix the logic in the program
-
       let tx: VersionedTransaction;
 
-      if (escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+      if (outputMint.equals(SOL_MINT)) {
         tx = await fill_wsol(
           compressed_account,
           escrow_data,
