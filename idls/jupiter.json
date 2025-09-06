@@ -842,7 +842,19 @@
           { "name": "PumpWrappedSellV2" },
           { "name": "PumpSwapBuyV2" },
           { "name": "PumpSwapSellV2" },
-          { "name": "Heaven", "fields": [{ "name": "a_to_b", "type": "bool" }] }
+          {
+            "name": "Heaven",
+            "fields": [{ "name": "a_to_b", "type": "bool" }]
+          },
+          {
+            "name": "SolFiV2",
+            "fields": [{ "name": "is_quote_to_base", "type": "bool" }]
+          },
+          { "name": "Aquifer" },
+          { "name": "PumpWrappedBuyV3" },
+          { "name": "PumpWrappedSellV3" },
+          { "name": "PumpSwapBuyV3" },
+          { "name": "PumpSwapSellV3" }
         ]
       }
     },

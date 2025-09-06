@@ -2,66 +2,96 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum CustomError {
-    #[msg("Invalid escrow owner. The owner of the esrow must be program ID")]
+    #[msg("Invalid escrow owner: the escrow must be owned by the program ID")]
     InvalidEscrowOwner,
-    #[msg("Invalid signer")]
+
+    #[msg("Unauthorized: invalid signer")]
     Unauthorized,
-    #[msg("invalid input mint")]
+
+    #[msg("Invalid input mint")]
     InvalidInputMint,
-    #[msg("invalid output mint")]
+
+    #[msg("Invalid output mint")]
     InvalidOutputMint,
-    #[msg("invalid token account passed")]
+
+    #[msg("Invalid token account")]
     InvalidTokenAccount,
-    #[msg("Invalid out amount need exact 2039280 lamports to create token account")]
+
+    #[msg("Invalid output amount: exactly 2,039,280 lamports required to create a token account")]
     InvalidOutAmount,
-    #[msg("Token Account already exsits")]
+
+    #[msg("Token account already exists")]
     TokenAccountAlreadyExists,
-    #[msg("Invalid instruction data from jupiter must be a exact out route or shared accounts exact out route")]
+
+    #[msg("Invalid Jupiter instruction data: must be an exact-out route or shared-accounts exact-out route")]
     InvalidJupInstructionData,
-    #[msg("Invalid in amount, must match the escrow account making amount")]
+
+    #[msg("Invalid input amount: must match the escrow account's making amount")]
     InvalidInAmount,
-    #[msg("Out taking amount too low")]
+
+    #[msg("Taking amount too low")]
     LowTakingAmount,
-    #[msg("Invalid escrow maker, must be the same as the escrow account maker")]
+
+    #[msg("Invalid escrow maker: must match the escrow account maker")]
     InvalidEscrowMaker,
-    #[msg("Slipppage too high")]
+
+    #[msg("Slippage too high")]
     SlippageTooHigh,
+
     #[msg("Invalid amount: must be greater than 0")]
     InvalidAmount,
-    #[msg("Invalid slippage: must be <= 10000 BPS")]
+
+    #[msg("Invalid slippage: must be ≤ 10,000 BPS")]
     InvalidSlippage,
+
     #[msg("Invalid expiration: must be in the future")]
     InvalidExpiration,
+
     #[msg("Insufficient balance")]
     InsufficientBalance,
+
     #[msg("Input and output mints cannot be the same")]
     SameMints,
+
     #[msg("Invalid mint configuration")]
     InvalidMint,
+
     #[msg("Order already exists")]
     OrderAlreadyExists,
+
     #[msg("Amount too large for safe calculations")]
     AmountTooLarge,
+
     #[msg("Math overflow")]
     MathOverflow,
+
     #[msg("Invalid escrow address")]
     InvalidEscrow,
-    #[msg("Invalid platform fee bps should be either 5 or 0")]
+
+    #[msg("Invalid platform fee BPS: must be either 0 or 5")]
     InvalidPlatformFeeBps,
-    #[msg("Invalid instruction to create ata when the making token is SOL call create_ata_wsol instruction")]
+
+    #[msg("Invalid instruction: to create an ATA for SOL, call `create_ata_wsol` instead")]
     InvalidCreateAtaInstruction,
-    #[msg("InvalidTokenProgramId")]
+
+    #[msg("Invalid token program ID")]
     InvalidTokenProgramId,
-    #[msg("Invalid Account")]
+
+    #[msg("Invalid account")]
     InvalidAccount,
-    #[msg("Account not writable")]
+
+    #[msg("Account is not writable")]
     NotWritable,
-    #[msg("Invalid number of Accounts")]
+
+    #[msg("Invalid number of accounts")]
     InvalidNumberOfAccounts,
-    #[msg("Taking account SOL ata is created separately")]
+
+    #[msg("SOL ATA must be created separately")]
     SolAtaCreatedSeparately,
-    #[msg("Order not expired")]
+
+    #[msg("Order has not expired")]
     OrderNotExpired,
-    #[msg("Call ExpireWSol Instruction")]
+
+    #[msg("Must call `expire_wsol` instruction")]
     ExpireWSolInstruction,
 }
