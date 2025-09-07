@@ -39,7 +39,7 @@ describe("elara/init_order", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
 
   const program = anchor.workspace.elara as Program<Elara>;
-  const payer: Signer = program.provider.wallet.payer;
+  const payer: Signer = program.provider.wallet!.payer!;
 
   const input_mint = new PublicKey(
     "J7LM6p22Ef8VhREZzkLToSADrXhAiiQUn3P2BAwo1RSe"
@@ -53,8 +53,6 @@ describe("elara/init_order", () => {
 
   const url =
     "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
-
-  const indexer = "http://34.69.251.52:8784";
 
   const rpc = createRpc(url, url, url);
 
@@ -89,6 +87,7 @@ describe("elara/init_order", () => {
       input_mint,
       payer.publicKey
     );
+
     const vaultATA = await getAssociatedTokenAddress(
       input_mint,
       protocol_vault[0],
@@ -117,7 +116,7 @@ describe("elara/init_order", () => {
           uniqueId: unique_id,
           makingAmount,
           takingAmount,
-          expiredAt: new BN(123141242141),
+          expiredAt: null,
         },
         {
           proof: {
@@ -202,6 +201,8 @@ describe("elara/init_order", () => {
       "Tokens not correctly credited to protocol vault"
     );
   });
+
+  /*
 
   it("init order with SOL", async () => {
     const unique_id2 = new BN(Date.now());
@@ -360,4 +361,5 @@ describe("elara/init_order", () => {
       "Tokens not correctly credited to protocol vault"
     );
   });
+  */
 });

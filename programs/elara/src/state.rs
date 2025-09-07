@@ -16,7 +16,7 @@ pub struct EscrowAccount {
     pub fee_bps: u16,
 }
 
-// TODO: Remove slippage, fee ori amounts -> 20 bytes saved
+// TODO: remove fee, ori amounts -> 20 bytes saved
 
 #[derive(
     Debug, Clone, Copy, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher,

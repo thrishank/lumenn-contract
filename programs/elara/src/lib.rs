@@ -35,7 +35,7 @@ pub mod elara {
     use super::*;
 
     /// This function creates a compressed escrow account using Light Protocol's state compression
-    /// stores the order details amount, slippage and tokens
+    /// stores the order details amount and tokens
     /// Transfers the maker's input tokens to the protocol vault
     pub fn initialize_order<'info>(
         ctx: Context<'_, '_, '_, 'info, InitializeOrder<'info>>,
@@ -44,9 +44,6 @@ pub mod elara {
     ) -> Result<()> {
         initialize_order::init(ctx, init_order_args, light_args)
     }
-
-    // checks needed to add
-    // https://chatgpt.com/c/68b00379-6f9c-8325-92d2-b0aac192c4ce
 
     /// cancel an existing order by maker or cancel when expired
     /// returns the tokens back to the maker and close the compressed escrow PDA aacount
@@ -72,7 +69,6 @@ pub mod elara {
 
     /// Update an existing order, change the making and taking amount
     /// change the expiry time
-    /// NOTE: no need a new instruction for wsol as this is signed by the payer itself
     pub fn update_order<'info>(
         ctx: Context<'_, '_, '_, 'info, UpdateOrder<'info>>,
         args: UpdateOrderArgs,

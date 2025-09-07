@@ -1,104 +1,40 @@
-# Notes
+# Elara
 
-## Fetching orders from the maker address
+A frictionless limit order app on Solana that removes rent costs, enabling CEX-like UX with fully on-chain self-custody.
 
-```typescript
-await rpc.getCompressedAccountsByOwner(PROGRAM_ID, {
-  filters: [
-    {
-      memcmp: {
-        offset: 0,
-        encoding: "base58",
-        bytes: new PublicKey("maker address").toBase58(),
-      },
-    },
-  ],
-});
-```
+## The Problem with Solana Limit Orders
 
-## Listening to the PROGRAM_ID logs
+On Solana, placing a limit order with current DeFi applications (e.g., Jupiter, Kamino) requires users to pay network rent (typically ~0.005 SOL) to create the necessary accounts for each order. This rent is locked up until the order is filled or canceled.
 
-```rust
+This creates significant friction:
 
-use solana_client::{
-    rpc_client::RpcClient,
-    rpc_config::{RpcTransactionLogsConfig, RpcTransactionLogsFilter},
-};
-use std::str::FromStr;
+- **Poor User Experience**: New users are often confused by rent, why they have to pay it, and the process of reclaiming it.
+- **Capital Inefficiency**: Placing multiple orders is expensive. For example, 10 open orders could lock up 0.05 SOL (~$9), discouraging active trading strategies.
 
-use solana_sdk::{
-    instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    signature::Keypair,
-    signer::Signer,
-    transaction::Transaction,
-};
+## Our Solution: Rent-Free Limit Orders
 
-use base64::{engine::general_purpose, Engine as _};
-use borsh::{BorshDeserialize, BorshSerialize};
-use solana_client::pubsub_client::PubsubClient;
+Elara eliminates rent by fundamentally changing how orders are stored and executed. We use on-chain data compression to store order details and a single, shared vault to hold user funds.
 
-#[derive(Debug, BorshDeserialize)]
-pub struct OrderInitialized {
-    pub escrow_address: Pubkey,
-    pub maker: Pubkey,
-    pub unique_id: u64,
-    pub input_mint: Pubkey,
-    pub output_mint: Pubkey,
-    pub input_mint_decimals: u8,
-    pub output_mint_decimals: u8,
-    pub making_amount: u64,
-    pub taking_amount: u64,
-    pub slippage_bps: u16,
-    pub expired_at: i64,
-}
+This allows for a seamless, capital-efficient trading experience where users can set multiple orders without locking up any SOL in rent.
 
-fn main() {
-    let ws_url = "wss://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
-    let program_id = Pubkey::from_str("4LhEEtzAhM6wEXJR2YQHPEs79UEx8e6HncmeHbqbW1w1").unwrap();
+## Key Features
 
-    println!("Connecting to WebSocket: {}", ws_url);
+- **Zero Rent**: Place unlimited limit orders without paying rent.
+- **CEX-like Experience**: Enjoy the fluid, frictionless trading experience of a centralized exchange, but fully decentralized and self-custodial.
+- **Capital Efficiency**: Keep your SOL liquid instead of having it locked in rent-paying accounts.
+- **Fully On-Chain**: All transactions are settled on the Solana blockchain, ensuring transparency and security.
+- Fritictionless UX: Simple and intuitive interface for placing and managing limit orders.
 
-    let (mut client, receiver) = PubsubClient::logs_subscribe(
-        ws_url,
-        RpcTransactionLogsFilter::Mentions(vec![program_id.to_string()]),
-        RpcTransactionLogsConfig {
-            commitment: Some(solana_sdk::commitment_config::CommitmentConfig::confirmed()),
-        },
-    )
-    .expect("Failed to subscribe to logs");
+## How It Works
 
-    println!("Subscribed to logs for program {}", program_id);
+1. **Initialize Order**: A user deposits tokens into the main Elara protocol vault and specifies the parameters for their limit order (e.g., "Sell 100 SOL for USDC when the price hits $200").
+2. **Store Order Data**: The order instructions are stored on-chain using light protocol zk compression.
+3. **Price Monitoring**: A backend matching engine continuously monitors asset prices.
+4. **Execute Swap**: When an asset reaches the user's target price, the backend swaps the tokens and tokens are sent to the user, swaps powered by Jupiter.
 
-    // TODO: need to validate this logs.
+## Technology Stack
 
-    for message in receiver {
-        for log in message.value.logs {
-            if let Some(data) = log.strip_prefix("Program data: ") {
-                match decode_event(data) {
-                    Ok(event) => println!("Decoded event: {:?}", event),
-                    Err(e) => eprintln!("Failed to decode event: {:?}", e),
-                }
-            }
-        }
-    }
+- **Smart Contract**: Rust, Anchor Framework
+- **Backend**: TypeScript, Node.js
+- **Testing**: TypeScript, Mocha, Chai
 
-    const ORDER_INITIALIZED_DISCRIMINATOR: [u8; 8] = [180, 118, 44, 249, 166, 25, 40, 81];
-    fn decode_event(data: &str) -> Result<OrderInitialized, Box<dyn std::error::Error>> {
-        let decoded = general_purpose::STANDARD.decode(data)?;
-        if decoded.len() < 8 {
-            return Err("Data too short".into());
-        }
-
-        if decoded[..8] != ORDER_INITIALIZED_DISCRIMINATOR {
-            return Err("Discriminator mismatch".into());
-        }
-
-        // Skip first 8 bytes (Anchor event discriminator)
-        let event_bytes = &decoded[8..];
-        let event = OrderInitialized::try_from_slice(event_bytes)?;
-        Ok(event)
-    }
-    // connection closes automatically when client goes out of scope
-}
-```
