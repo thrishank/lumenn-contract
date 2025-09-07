@@ -1,4 +1,4 @@
-# Elara
+# Lumenn
 
 A frictionless limit order app on Solana that removes rent costs, enabling CEX-like UX with fully on-chain self-custody.
 
