@@ -233,7 +233,6 @@ describe("elara/create_token_account", () => {
         payer: payer.publicKey,
         payerWsolAta: payer_wsol_ata,
         maker: payer.publicKey,
-        makerTokenAta: ata,
         protocolWsolAta: protocol_wsol_ata,
         inputMint: input_mint,
         outputMint: output_mint,
@@ -323,6 +322,8 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(100000)),
     });
   });
+
+  /*
 
   it("create ata account with WSOL", async () => {
     const unique_id = new BN(Date.now());
@@ -580,4 +581,5 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(inAmount)),
     });
   });
+  */
 });

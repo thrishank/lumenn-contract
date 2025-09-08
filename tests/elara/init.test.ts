@@ -9,6 +9,7 @@ import {
 import { Program } from "@coral-xyz/anchor";
 import { Elara } from "../../target/types/elara";
 import {
+  AddressLookupTableAccount,
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
@@ -34,6 +35,7 @@ import {
 
 import { assert } from "chai";
 import { assertEscrowState } from "../utils/check";
+import { calculateTransactionSize } from "../utils/fn";
 
 describe("elara/init_order", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -202,8 +204,6 @@ describe("elara/init_order", () => {
     );
   });
 
-  /*
-
   it("init order with SOL", async () => {
     const unique_id2 = new BN(Date.now());
 
@@ -294,6 +294,19 @@ describe("elara/init_order", () => {
 
     // transaction size 1147 bytes
 
+    const alt = ["qAJZMgnQJ8G6vA3WRcjD9Jan1wtKkaCFWLWskxJrR5V"];
+
+    const altLookups = await Promise.all(
+      alt.map(async (address: any) => {
+        const alt = await rpc.getAddressLookupTable(new PublicKey(address));
+        if (!alt.value) throw new Error(`ALT not found: ${address}`);
+        return new AddressLookupTableAccount({
+          key: new PublicKey(address),
+          state: alt.value.state,
+        });
+      })
+    );
+
     const latestBlockhash = await rpc.getLatestBlockhash();
     const message = new TransactionMessage({
       payerKey: payer.publicKey,
@@ -319,10 +332,13 @@ describe("elara/init_order", () => {
           maker.publicKey
         ),
       ],
-    }).compileToV0Message();
+    }).compileToV0Message(altLookups);
 
     const tx = new VersionedTransaction(message);
     tx.sign([payer, maker]);
+
+    const size = calculateTransactionSize(tx);
+    console.log(size);
 
     const sig = await rpc.sendTransaction(tx);
     console.log("Order initialized signature:", sig);
@@ -361,5 +377,4 @@ describe("elara/init_order", () => {
       "Tokens not correctly credited to protocol vault"
     );
   });
-  */
 });

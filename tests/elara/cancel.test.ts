@@ -32,7 +32,7 @@ import {
   CLOSE_ACCOUNTS,
   INIT_REMAINING_ACCOUNTS,
 } from "../utils/address";
-import { parseEscrowFromBuffer } from "../utils/fn";
+import { calculateTransactionSize, parseEscrowFromBuffer } from "../utils/fn";
 
 import { assert } from "chai";
 import { assertEscrowDoesNotExist } from "../utils/check";
@@ -615,7 +615,7 @@ describe("elara/cancel_order", () => {
     const makerBalanceBefore = await rpc.getBalance(maker.publicKey);
     const vaultBalanceBefore = Number(vaultAccountBefore.amount ?? 0);
 
-    const tx1 = await program.methods
+    const instruction = await program.methods
       .cancelOrder({
         escrowAccount: {
           uniqueId: escrow_data.uniqueId,
@@ -658,17 +658,32 @@ describe("elara/cancel_order", () => {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
       ])
-      .postInstructions([
+      .postInstructions([])
+      .instruction();
+
+    const latestBlockhash = await rpc.getLatestBlockhash();
+    const message = new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: latestBlockhash.blockhash,
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+        instruction,
         createCloseAccountInstruction(
           wSOL_ata,
           payer.publicKey,
           maker.publicKey
         ),
-      ])
-      .signers([payer, maker])
-      .rpc();
+      ],
+    }).compileToV0Message();
 
-    console.log("Order cancelled with transaction signature:", tx1);
+    const tx = new VersionedTransaction(message);
+    tx.sign([payer, maker]);
+
+    const size = calculateTransactionSize(tx);
+    console.log(size);
+
+    const sig = await rpc.sendTransaction(tx);
+    console.log("Order initialized signature:", sig);
 
     await assertEscrowDoesNotExist({ rpc, address });
 
