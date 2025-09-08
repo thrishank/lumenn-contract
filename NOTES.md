@@ -9,3 +9,12 @@
 - expire should be in future or null, Error Code: InvalidExpiration. Error Number: 6014.
 - same input and output mints, Error Code: SameMints. Error Number: 6016
 - light init hard coded accounts validation, Error Code: InvalidNumberOfAccounts. Error Number: 6027. Error Code: InvalidAccount. Error Number: 6025
+
+## Cancel Order
+
+- for not expired orders, maker can only cancel, if not: Error Code: Unauthorized. Error Number: 6001.
+
+# Transaction
+
+- Initalize Order - 1145, WITH ALT 931
+- cancel Order - 1060 WITH no ALT

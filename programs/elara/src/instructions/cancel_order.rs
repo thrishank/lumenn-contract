@@ -27,7 +27,7 @@ pub struct CancelOrder<'info> {
     pub payer: Signer<'info>,
 
     /// The maker of the order - must be signer for non-expired orders
-    /// For expired orders, anyone can cancel (including workers/keepers)
+    /// For expired orders, anyone can cancel
     /// CHECK: Verified in instruction logic based on expiration status
     pub maker: AccountInfo<'info>,
 
@@ -138,10 +138,11 @@ pub fn cancel<'info>(
     );
 
     let current_timestamp = Clock::get()?.unix_timestamp;
+    // NOTE: expired_at of 0 means no expiration
     let is_expired = escrow_account.expired_at > 0 && current_timestamp > escrow_account.expired_at;
 
     // For non-expired orders, only maker can cancel
-    // For expired orders, anyone can cancel (cleanup mechanism)
+    // For expired orders, anyone can cancel
     if !is_expired {
         require!(ctx.accounts.maker.is_signer, CustomError::Unauthorized);
     }
@@ -186,14 +187,12 @@ pub fn cancel<'info>(
         authority: ctx.accounts.protocol_vault.to_account_info(),
     };
 
-    let cpi_transfer = CpiContext::new_with_signer(
-        ctx.accounts.input_token_program.to_account_info(),
-        transfer_accoutns,
-        &signer_seeds,
-    );
-
     transfer_checked(
-        cpi_transfer,
+        CpiContext::new_with_signer(
+            ctx.accounts.input_token_program.to_account_info(),
+            transfer_accoutns,
+            &signer_seeds,
+        ),
         escrow_account.amount.making_amount,
         ctx.accounts.input_mint.decimals,
     )?;

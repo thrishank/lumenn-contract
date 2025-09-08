@@ -162,6 +162,12 @@ pub fn expire<'info>(
 
     let signer_seeds: [&[&[u8]]; 1] = [&[b"protocol_vault", &[ctx.bumps.protocol_vault]]];
 
+    let temp_amount = escrow_account
+        .amount
+        .making_amount
+        .checked_sub(ATA_CREATION_AMOUNT)
+        .ok_or(CustomError::InvalidAmount)?;
+
     transfer_checked(
         CpiContext::new_with_signer(
             ctx.accounts.input_token_program.to_account_info(),
@@ -173,7 +179,7 @@ pub fn expire<'info>(
             },
             &signer_seeds,
         ),
-        escrow_account.amount.making_amount - ATA_CREATION_AMOUNT,
+        temp_amount,
         ctx.accounts.sol_mint.decimals,
     )?;
 
