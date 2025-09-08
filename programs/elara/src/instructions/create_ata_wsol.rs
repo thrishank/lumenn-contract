@@ -11,7 +11,7 @@ use light_sdk::{
 
 use crate::{
     error::CustomError,
-    state::EscrowAccount,
+    state::{AccountParams, EscrowAccount, Tokens},
     utils::{expected_accounts, validate_light_accounts, LightAccountSet},
     LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
@@ -35,8 +35,7 @@ pub struct CreateTokenWsol<'info> {
         payer = payer,
         associated_token::mint = output_mint,
         associated_token::authority = maker,
-        associated_token::token_program = token_program
-
+        associated_token::token_program = output_token_program
     )]
     pub maker_token_ata: InterfaceAccount<'info, TokenAccount>,
 
@@ -51,7 +50,7 @@ pub struct CreateTokenWsol<'info> {
         mut,
         associated_token::mint = sol_mint,
         associated_token::authority = protocol_vault,
-        associated_token::token_program = token_program
+        associated_token::token_program = input_token_program
     )]
     pub protocol_vault_input_mint_ata: InterfaceAccount<'info, TokenAccount>,
 
@@ -60,12 +59,14 @@ pub struct CreateTokenWsol<'info> {
         payer = payer,
         associated_token::mint = sol_mint,
         associated_token::authority = payer,
-        associated_token::token_program = token_program
+        associated_token::token_program = input_token_program
 
     )]
     pub payer_wsol_mint_ata: InterfaceAccount<'info, TokenAccount>,
 
-    pub token_program: Interface<'info, TokenInterface>,
+    pub input_token_program: Interface<'info, TokenInterface>,
+    pub output_token_program: Interface<'info, TokenInterface>,
+
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
@@ -73,7 +74,7 @@ pub struct CreateTokenWsol<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct CreateTokenAccountWsolArgs {
     pub swap_data: Vec<u8>,
-    pub escrow_account: EscrowAccount,
+    pub escrow_account: AccountParams,
     pub proof: ValidityProof,
     pub account_meta: CompressedAccountMeta,
 }
@@ -82,9 +83,17 @@ pub fn create_token_account<'info>(
     ctx: Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
     args: CreateTokenAccountWsolArgs,
 ) -> Result<()> {
+    if ctx.accounts.output_mint.key() == SOL_MINT {
+        return Err(error!(CustomError::InvalidOutputMint));
+    };
+
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
-    if jup_data.out_amount != 2039280 {
+    let rent = Rent::get()?;
+    let ata_creation_amount =
+        rent.minimum_balance(ctx.accounts.maker_token_ata.to_account_info().data_len());
+
+    if jup_data.out_amount != ata_creation_amount {
         return Err(error!(CustomError::InvalidOutAmount));
     }
 
@@ -100,14 +109,9 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
-    let is_making_sol = ctx.accounts.sol_mint.key() == SOL_MINT
-        && args.escrow_account.tokens.input_mint.key() == SOL_MINT;
+    transfer_sol_from_vault(&ctx, ata_creation_amount)?;
 
-    require!(is_making_sol, CustomError::InvalidInputMint);
-
-    transfer_sol_from_vault(&ctx, 2039280)?;
-
-    light_cpi(&ctx, &args, jup_data.in_amount)
+    light_cpi(&ctx, &args, jup_data.in_amount, ata_creation_amount)
 
     // ata created in the accounts macro
 }
@@ -116,6 +120,7 @@ fn light_cpi<'info>(
     ctx: &Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
     args: &CreateTokenAccountWsolArgs,
     amount_swapped: u64,
+    ata_creation_amount: u64,
 ) -> Result<()> {
     let escrow_account = args.escrow_account;
 
@@ -123,9 +128,14 @@ fn light_cpi<'info>(
         &crate::ID,
         &args.account_meta,
         EscrowAccount {
-            maker: escrow_account.maker,
+            maker: ctx.accounts.maker.key(),
             unique_id: escrow_account.unique_id,
-            tokens: escrow_account.tokens,
+            tokens: Tokens {
+                input_mint: ctx.accounts.sol_mint.key(),
+                output_mint: ctx.accounts.output_mint.key(),
+                input_token_program: ctx.accounts.input_token_program.key(),
+                output_token_program: ctx.accounts.output_token_program.key(),
+            },
             amount: escrow_account.amount,
             fee_bps: escrow_account.fee_bps,
             expired_at: escrow_account.expired_at,
@@ -138,7 +148,7 @@ fn light_cpi<'info>(
     escrow.amount.making_amount = escrow
         .amount
         .making_amount
-        .checked_sub(2039280)
+        .checked_sub(ata_creation_amount)
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
     // NOTE: calculate the equivalent taking amount and subtract it from the state
@@ -183,7 +193,7 @@ pub fn transfer_sol_from_vault<'info>(
     };
 
     let cpi_transfer = CpiContext::new(
-        ctx.accounts.token_program.to_account_info(),
+        ctx.accounts.input_token_program.to_account_info(),
         cpi_transfer_accounts,
     );
 
