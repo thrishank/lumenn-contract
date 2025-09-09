@@ -292,6 +292,8 @@ describe("elara/create_token_account", () => {
 
     console.log("✅ Signature:", sig);
 
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
     const makerATA = await getAssociatedTokenAddress(
       output_mint,
       payer.publicKey
@@ -322,8 +324,6 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(100000)),
     });
   });
-
-  /*
 
   it("create ata account with WSOL", async () => {
     const unique_id = new BN(Date.now());
@@ -551,6 +551,8 @@ describe("elara/create_token_account", () => {
     const sig = await rpc.sendTransaction(tx_cancel);
     console.log("✅ Signature:", sig);
 
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
     const makerATA = await getAssociatedTokenAddress(
       output_mint,
       payer.publicKey
@@ -581,5 +583,4 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(inAmount)),
     });
   });
-  */
 });

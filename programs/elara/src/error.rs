@@ -94,4 +94,9 @@ pub enum CustomError {
 
     #[msg("Must call `expire_wsol` instruction")]
     ExpireWSolInstruction,
+
+    #[msg(
+        "Invalid fee token account in jupiter accounts. The fee account must be ata of input_mint"
+    )]
+    InvalidFeeAccount,
 }

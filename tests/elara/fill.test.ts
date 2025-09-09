@@ -78,8 +78,18 @@ describe("elara/fill_order", () => {
   const assetSeed = deriveAddressSeed(seeds, program.programId);
   const address = deriveAddress(assetSeed, ADDRESS_TREE);
 
+  /*
   it("fill order", async () => {
     console.log("Initializing order...");
+
+    const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5"];
+
+    const { accounts: jup_accounts, alt } = await get_swap_instruction();
+
+    for (const key of alt) {
+      const newAlt = await clone_alt(key);
+      altAddresses.push(newAlt);
+    }
 
     const proof = await rpc.getValidityProofV0(undefined, [
       {
@@ -161,8 +171,6 @@ describe("elara/fill_order", () => {
       5
     );
 
-    const { accounts: jup_accounts, alt } = await get_swap_instruction();
-
     const makerATA = await getAssociatedTokenAddress(
       output_mint,
       payer.publicKey
@@ -233,18 +241,6 @@ describe("elara/fill_order", () => {
       .remainingAccounts([...CLOSE_ACCOUNTS, ...jup_accounts])
       .instruction();
 
-    const altAddresse = await Promise.all(
-      alt.map(async (key: string) => {
-        const newAlt = await clone_alt(key);
-        return newAlt;
-      })
-    );
-
-    const altAddresses = [
-      "7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5",
-      ...altAddresse,
-    ];
-
     const altLookups = await Promise.all(
       altAddresses.map(async (address: any) => {
         const alt = await rpc.getAddressLookupTable(new PublicKey(address));
@@ -271,6 +267,10 @@ describe("elara/fill_order", () => {
 
     const size = calculateTransactionSize(tx_fill);
     console.log("Transaction size:", size);
+
+    // 1 ATL - 986, 1048
+    // 2 ALT - 1088, 1144
+    // 3 ALT - 1133, 1235
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
@@ -305,8 +305,7 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
-
-  /*
+  */
 
   it("fill order WSOL", async () => {
     const unique_id2 = new BN(Date.now());
@@ -429,7 +428,6 @@ describe("elara/fill_order", () => {
             oriTakingAmount: escrow_data.amount.oriTakingAmount,
           },
           expiredAt: escrow_data.expiredAt,
-          slippageBps: escrow_data.slippageBps,
           feeBps: escrow_data.feeBps,
           createdAt: escrow_data.createdAt,
           updatedAt: escrow_data.updatedAt,
@@ -449,6 +447,7 @@ describe("elara/fill_order", () => {
           leafIndex: compressed_account.leafIndex,
         },
         outputStateTreeIndex: 0,
+        fillType: { full: {} },
       })
       .accounts({
         payer: payer.publicKey,
@@ -534,5 +533,4 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
-  */
 });

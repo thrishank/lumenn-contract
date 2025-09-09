@@ -28,7 +28,7 @@ export async function get_swap_instruction(
     data: JSON.stringify({
       userPublicKey: "HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd",
       quoteResponse: quote.data,
-      // TODO: add &feeRecipient
+      // TODO: add &feeRecipient and make sure the token account(for input_mint) exists if not create
     }),
   };
   const swap = await axios.request(config);

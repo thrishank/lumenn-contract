@@ -1,3 +1,4 @@
+use crate::FEE_ACCOUNT;
 use crate::{
     error::CustomError, instructions::JupiterRoutes, JUPITER_EVENT_AUTHORITY,
     JUPITER_V6_PROGRAM_ID, PROTOCOL_VAULT,
@@ -105,7 +106,17 @@ fn validate_exact_out_route(
         CustomError::InvalidOutputMint
     );
 
-    // 7 platform fee_account
+    let fee_ata = get_associated_token_address_with_program_id(
+        &FEE_ACCOUNT,
+        &input_mint,
+        &input_token_program,
+    );
+
+    require_keys_eq!(
+        jup_accounts[7].key(),
+        fee_ata,
+        CustomError::InvalidFeeAccount
+    );
 
     require_keys_eq!(
         jup_accounts[8].key(),
@@ -183,7 +194,17 @@ fn validate_route(
         CustomError::InvalidOutputMint
     );
 
-    // 6 platform fee_account
+    let fee_ata = get_associated_token_address_with_program_id(
+        &FEE_ACCOUNT,
+        &input_mint,
+        &input_token_program,
+    );
+
+    require_keys_eq!(
+        jup_accounts[6].key(),
+        fee_ata,
+        CustomError::InvalidFeeAccount
+    );
 
     require_keys_eq!(
         jup_accounts[7].key(),
@@ -289,7 +310,17 @@ fn validate_shared_accounts_route(
         CustomError::InvalidOutputMint
     );
 
-    // 9 platform fee_account
+    let fee_ata = get_associated_token_address_with_program_id(
+        &FEE_ACCOUNT,
+        &input_mint,
+        &input_token_program,
+    );
+
+    require_keys_eq!(
+        jup_accounts[9].key(),
+        fee_ata,
+        CustomError::InvalidFeeAccount
+    );
 
     require_keys_eq!(
         jup_accounts[10].key(),

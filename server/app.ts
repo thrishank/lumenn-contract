@@ -287,6 +287,7 @@ app.get(
 
       let tx: VersionedTransaction;
 
+      // TODO: if the transactin size is too large, set the only_direct_routes paramter in jup swap and try again
       if (outputMint.equals(SOL_MINT)) {
         tx = await fill_wsol(
           compressed_account,

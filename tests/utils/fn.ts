@@ -102,7 +102,7 @@ const DEVNET = new Connection(
   "confirmed"
 );
 
-export async function clone_alt(address: string): Promise<String> {
+export async function clone_alt(address: string): Promise<string> {
   const devnetKeypair: Keypair = await getKeypairFromFile();
   const { value: mainnetAlt } = await MAINNET.getAddressLookupTable(
     new PublicKey(address)
