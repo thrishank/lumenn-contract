@@ -21,3 +21,6 @@ pub use fill_order::*;
 
 pub mod update_order;
 pub use update_order::*;
+
+pub mod close_protocol_ata;
+pub use close_protocol_ata::*;

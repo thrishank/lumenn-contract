@@ -99,4 +99,7 @@ pub enum CustomError {
         "Invalid fee token account in jupiter accounts. The fee account must be ata of input_mint"
     )]
     InvalidFeeAccount,
+
+    #[msg("Token account is not empty")]
+    TokenAccountNotEmpty,
 }

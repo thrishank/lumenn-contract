@@ -120,6 +120,12 @@ pub mod elara {
     ) -> Result<()> {
         fill_wsol_order::fill(ctx, args)
     }
+
+    pub fn close_protocol_ata<'info>(
+        ctx: Context<'_, '_, '_, 'info, CloseProtocolAta<'info>>,
+    ) -> Result<()> {
+        close_protocol_ata::close_protocol_ata(ctx)
+    }
 }
 
 pub fn swap_cpi<'info>(
