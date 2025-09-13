@@ -35,6 +35,5 @@ This allows for a seamless, capital-efficient trading experience where users can
 ## Technology Stack
 
 - **Smart Contract**: Rust, Anchor Framework
-- **Backend**: TypeScript, Node.js
-- **Testing**: TypeScript, Mocha, Chai
-
+- **Backend**: Rust,
+- **Frontend**: TypeScript, NextJS

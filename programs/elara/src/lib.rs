@@ -23,8 +23,8 @@ use crate::error::CustomError;
 solana_security_txt::security_txt! {
     name: "Limit Order Program V1",
     contacts: "thris.dev@gmail.com",
-    source_code: "https://github.com/thrishank/native-escrow",
-    project_url: "https://github.com/thrishank/native-escrow",
+    source_code: "https://github.com/thrishank/elara",
+    project_url: "https://github.com/thrishank/elara",
     policy: "",
     preferred_languages: "en"
 }
@@ -121,6 +121,7 @@ pub mod elara {
         fill_wsol_order::fill(ctx, args)
     }
 
+    /// Close empty protocol vault token accounts
     pub fn close_protocol_ata<'info>(
         ctx: Context<'_, '_, '_, 'info, CloseProtocolAta<'info>>,
     ) -> Result<()> {

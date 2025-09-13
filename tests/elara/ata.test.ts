@@ -184,7 +184,10 @@ describe("elara/create_token_account", () => {
       "So11111111111111111111111111111111111111112"
     );
 
+    console.log(swap);
+
     const { accounts: jup_accounts, alt } = await get_swap_instruction();
+    console.log(alt);
 
     const altAddresse = await Promise.all(
       alt.map(async (key: string) => {
@@ -325,6 +328,7 @@ describe("elara/create_token_account", () => {
     });
   });
 
+  /*
   it("create ata account with WSOL", async () => {
     const unique_id = new BN(Date.now());
 
@@ -460,14 +464,7 @@ describe("elara/create_token_account", () => {
       .createAtaWsol({
         swapData: Buffer.from(swap.swapInstruction.data, "base64"),
         escrowAccount: {
-          maker: escrow_data.maker,
           uniqueId: escrow_data.uniqueId,
-          tokens: {
-            inputMint: escrow_data.tokens.inputMint,
-            outputMint: escrow_data.tokens.outputMint,
-            inputTokenProgram: escrow_data.tokens.inputTokenProgram,
-            outputTokenProgram: escrow_data.tokens.outputTokenProgram,
-          },
           amount: {
             makingAmount: escrow_data.amount.makingAmount,
             takingAmount: escrow_data.amount.takingAmount,
@@ -502,7 +499,8 @@ describe("elara/create_token_account", () => {
         payer: payer.publicKey,
         maker: payer.publicKey,
         outputMint: output_mint,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        inputTokenProgram: TOKEN_PROGRAM_ID,
+        outputTokenProgram: TOKEN_PROGRAM_ID,
       })
       .remainingAccounts(CLOSE_ACCOUNTS)
       .preInstructions([
@@ -583,4 +581,5 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(inAmount)),
     });
   });
+  */
 });

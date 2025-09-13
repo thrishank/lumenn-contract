@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
+import { Escrow } from "../tests/utils/fn";
 
 export async function get_swap_instruction(
   input_mint: string,
@@ -64,4 +65,44 @@ export async function get_price(input_mint: string, output_mint: string) {
   const current_ratio = inputPrice / outputPrice;
 
   return { current_ratio, inputPrice, outputPrice };
+}
+
+export async function determineFillType(
+  escrow_data: Escrow,
+  inputMint: PublicKey,
+  outputMint: PublicKey
+): Promise<{
+  fill_type: "full" | "partial";
+  divisor: number;
+  instruction_data: any;
+  accounts: any[];
+  alt: any[];
+}> {
+  let tryInAmount = escrow_data.amount.makingAmount.toNumber();
+  let tryTakingAmount = escrow_data.amount.takingAmount.toNumber();
+  let divisor = 1;
+
+  while (tryInAmount > 0 && tryTakingAmount > 0) {
+    const { inAmount, outAmount, instruction_data, accounts, alt } =
+      await get_swap_instruction(
+        inputMint.toString(),
+        outputMint.toString(),
+        tryInAmount,
+        "ExactIn"
+      );
+
+    if (outAmount >= escrow_data.amount.takingAmount.toNumber()) {
+      return { fill_type: "full", divisor, instruction_data, accounts, alt };
+    }
+
+    if (outAmount >= tryTakingAmount) {
+      return { fill_type: "partial", divisor, instruction_data, accounts, alt };
+    }
+
+    divisor *= 2;
+    tryInAmount = Math.floor(tryInAmount / 2);
+    tryTakingAmount = Math.floor(tryTakingAmount / 2);
+  }
+
+  throw new Error("Swap Quote not found to fill the order");
 }

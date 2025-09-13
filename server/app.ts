@@ -1,4 +1,4 @@
-import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
 import { Elara } from "../target/types/elara";
 import IDL from "../target/idl/elara.json";
 import {
@@ -12,7 +12,7 @@ import express from "express";
 import { bn, createRpc } from "@lightprotocol/stateless.js";
 import { ADDRESS_QUEUE, ADDRESS_TREE } from "../tests/utils/address";
 import { parseEscrowFromBuffer } from "../tests/utils/fn";
-import { get_price, get_swap_instruction } from "./jup";
+import { determineFillType, get_price, get_swap_instruction } from "./jup";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { create_ata, create_ata_wsol } from "./create_ata";
 import { fill, fill_wsol } from "./fill";
@@ -115,7 +115,6 @@ app.get(
     const { requestId, startTime } = res.locals;
 
     try {
-      // TODO: calculate the traget ratio from the order state
       let { order } = req.query;
 
       logger.info("Fill request started", { requestId, order });
@@ -164,105 +163,14 @@ app.get(
         throw new Error("Order has expired");
       }
 
-      let fill_type: "full" | "partial" = "full";
-
-      let tryInAmount = escrow_data.amount.makingAmount.toNumber();
-      let tryTakingAmount = escrow_data.amount.takingAmount.toNumber();
-
-      let finalInstructionData: any = null;
-      let finalAccounts: any[] = [];
-      let finalAlt: any[] = [];
-
-      let price_check = true;
-
-      while (tryInAmount > 0 && tryTakingAmount > 0) {
-        const outputMint = new PublicKey(
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-        );
-
-        const {
-          inAmount,
-          outAmount,
-          priceImpactPct,
-          instruction_data,
-          accounts,
-          alt,
-        } = await get_swap_instruction(
-          inputMint.toString(),
-          outputMint.toString(),
-          tryInAmount,
-          "ExactIn"
-        );
-
-        logger.info("Swap Data", {
-          requestId,
-          inAmount,
-          outAmount,
-          priceImpactPct,
-          accountsCount: accounts.length,
-          altCount: alt.length,
-        });
-
-        if (outAmount >= escrow_data.amount.takingAmount.toNumber()) {
-          fill_type = "full";
-          finalInstructionData = instruction_data;
-          finalAccounts = accounts;
-          finalAlt = alt;
-          break;
-        }
-
-        if (price_check) {
-          price_check = false;
-          const { current_ratio } = await get_price(
-            inputMint.toString(),
-            outputMint.toString()
-          );
-
-          const target_ratio = caluclate_target_ratio(
-            escrow_data.amount.makingAmount.toNumber(),
-            escrow_data.amount.takingAmount.toNumber(),
-            inputMint.toString(),
-            outputMint.toString()
-          );
-
-          console.log(target_ratio, current_ratio);
-
-          if (Number(target_ratio) > current_ratio) {
-            throw new Error(
-              `Target Ratio: ${target_ratio} is greater than current market ratio: ${current_ratio} `
-            );
-          }
-        }
-
-        if (outAmount >= tryTakingAmount) {
-          fill_type = "partial";
-          finalInstructionData = instruction_data;
-          finalAccounts = accounts;
-          finalAlt = alt;
-          break;
-        }
-
-        tryInAmount = Math.floor(tryInAmount / 2);
-        tryTakingAmount = Math.floor(tryTakingAmount / 2);
-      }
-
-      if (!finalInstructionData) {
-        throw new Error("Swap Quote not found to fill the order");
-      }
-
-      let hash = compressed_account.hash;
-
-      let proof = await rpc.getValidityProofV0(
-        [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
-        []
-      );
-
       const ata = await getAssociatedTokenAddress(
         escrow_data.tokens.outputMint,
         escrow_data.maker
       );
 
       const ata_exist = await rpc.getAccountInfo(ata);
+
+      let ata_created = false;
 
       if (!ata_exist && !outputMint.equals(SOL_MINT)) {
         logger.info("Creating ATA for maker", {
@@ -271,9 +179,9 @@ app.get(
         });
 
         if (inputMint.equals(SOL_MINT)) {
-          await create_ata_wsol(address);
+          await create_ata_wsol(compressed_account, escrow_data);
         } else {
-          await create_ata(address);
+          await create_ata(compressed_account, escrow_data);
         }
 
         // Verify ATA was created
@@ -282,7 +190,67 @@ app.get(
           throw new Error("Failed to create ATA for maker");
         }
 
+        ata_created = true;
         logger.info("ATA created successfully", { requestId });
+      }
+
+      // TODO: move this to a seperate function because if the ata is created then we need to fetch with
+      // new data just give me the fill_type and divisor of the making amount if parital then in the final
+      // while sending the transaction i refetch the quote this is only needed if the ata is created above
+      // because the order status is changed
+      const { current_ratio } = await get_price(
+        inputMint.toString(),
+        outputMint.toString()
+      );
+
+      const target_ratio = caluclate_target_ratio(
+        escrow_data.amount.makingAmount.toNumber(),
+        escrow_data.amount.takingAmount.toNumber(),
+        inputMint.toString(),
+        outputMint.toString()
+      );
+
+      if (Number(target_ratio) > current_ratio) {
+        throw new Error(
+          `Target Ratio: ${target_ratio} is greater than current market ratio: ${current_ratio} `
+        );
+      }
+
+      const fill_data = await determineFillType(
+        escrow_data,
+        inputMint,
+        outputMint
+      );
+
+      let finalInstructionData: any = null;
+      let finalAccounts: any[] = [];
+      let finalAlt: any[] = [];
+
+      if (ata_created) {
+        const compressed_account = await rpc.getCompressedAccount(
+          bn(address.toBytes())
+        );
+
+        const escrow_data = parseEscrowFromBuffer(compressed_account.data.data);
+        const { instruction_data, accounts, alt } = await get_swap_instruction(
+          inputMint.toString(),
+          outputMint.toString(),
+          escrow_data.amount.makingAmount
+            .div(new BN(fill_data.divisor))
+            .toNumber(),
+          "ExactIn"
+        );
+        finalInstructionData = instruction_data;
+        finalAccounts = accounts;
+        finalAlt = alt;
+      } else {
+        finalInstructionData = fill_data.instruction_data;
+        finalAccounts = fill_data.accounts;
+        finalAlt = fill_data.accounts;
+      }
+
+      if (!finalInstructionData) {
+        throw new Error("Swap Quote not found to fill the order");
       }
 
       let tx: VersionedTransaction;
@@ -290,20 +258,16 @@ app.get(
       // TODO: if the transactin size is too large, set the only_direct_routes paramter in jup swap and try again
       if (outputMint.equals(SOL_MINT)) {
         tx = await fill_wsol(
-          compressed_account,
-          escrow_data,
-          proof,
-          fill_type === "partial" ? "partial" : "full",
+          address,
+          fill_data.fill_type === "partial" ? "partial" : "full",
           finalInstructionData,
           finalAccounts,
           finalAlt
         );
       } else {
         tx = await fill(
-          compressed_account,
-          escrow_data,
-          proof,
-          fill_type === "partial" ? "partial" : "full",
+          address,
+          fill_data.fill_type === "partial" ? "partial" : "full",
           finalInstructionData,
           finalAccounts,
           finalAlt
@@ -322,7 +286,7 @@ app.get(
         sig,
         responseTime: `${responseTime.toFixed(2)}ms`,
         order: address.toString(),
-        fillType: fill_type || "full",
+        fillType: fill_data.fill_type,
       });
       return res.status(200).json({ sig });
     } catch (error) {
@@ -356,7 +320,7 @@ app.get(
         throw new Error("Invalid order address - not a valid PublicKey");
       }
 
-      const compressed_account = await retryOperation(
+      let compressed_account = await retryOperation(
         () => rpc.getCompressedAccount(bn(address.toBytes())),
         3,
         1000,
@@ -366,13 +330,6 @@ app.get(
       if (!compressed_account?.data?.data) {
         throw new Error("Compressed account not found or has no data");
       }
-
-      let hash = compressed_account.hash;
-
-      let proof = await rpc.getValidityProofV0(
-        [{ hash, tree: ADDRESS_TREE, queue: ADDRESS_QUEUE }],
-        []
-      );
 
       const buffer = compressed_account?.data?.data!;
 
@@ -408,18 +365,18 @@ app.get(
         logger.info("Creating ATA for expired order", { requestId });
 
         if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
-          await create_ata_wsol(address);
+          await create_ata_wsol(compressed_account, escrow_data);
         } else {
-          await create_ata(address);
+          await create_ata(compressed_account, escrow_data);
         }
       }
 
       let tx: VersionedTransaction;
 
       if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
-        tx = await expire_wsol(compressed_account, escrow_data, proof);
+        tx = await expire_wsol(address);
       } else {
-        tx = await expire(compressed_account, escrow_data, proof);
+        tx = await expire(address);
       }
 
       tx.sign([payer]);

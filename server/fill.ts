@@ -1,7 +1,4 @@
-import {
-  CompressedAccountWithMerkleContext,
-  ValidityProofWithContext,
-} from "@lightprotocol/stateless.js";
+import { bn } from "@lightprotocol/stateless.js";
 import { payer, program, rpc } from "./app";
 import {
   AddressLookupTableAccount,
@@ -10,19 +7,42 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { CLOSE_ACCOUNTS } from "../tests/utils/address";
-import { Escrow } from "../tests/utils/fn";
+import {
+  ADDRESS_QUEUE,
+  ADDRESS_TREE,
+  CLOSE_ACCOUNTS,
+} from "../tests/utils/address";
+import { parseEscrowFromBuffer } from "../tests/utils/fn";
+import { retryOperation } from "./utils";
 
 export async function fill(
-  compressed_account: CompressedAccountWithMerkleContext,
-  escrow_data: Escrow,
-  proof: ValidityProofWithContext,
+  address: PublicKey,
   fill_type: "full" | "partial",
   instruction_data: any,
   accounts: any[],
   alt: any[]
 ) {
+  const compressed_account = await retryOperation(
+    () => rpc.getCompressedAccount(bn(address.toBytes())),
+    3,
+    1000,
+    "getCompressedAccount"
+  );
+
+  let proof = await rpc.getValidityProofV0(
+    [
+      {
+        hash: compressed_account.hash,
+        tree: ADDRESS_TREE,
+        queue: ADDRESS_QUEUE,
+      },
+    ],
+    []
+  );
+
   const validityProof = proof.compressedProof;
+
+  const escrow_data = parseEscrowFromBuffer(compressed_account.data.data);
 
   const instruction = await program.methods
     .fillOrder({
@@ -98,15 +118,33 @@ export async function fill(
 }
 
 export async function fill_wsol(
-  compressed_account: CompressedAccountWithMerkleContext,
-  escrow_data: Escrow,
-  proof: ValidityProofWithContext,
+  address: PublicKey,
   fill_type: "full" | "partial",
   instruction_data: any,
   accounts: any[],
   alt: any[]
 ) {
+  const compressed_account = await retryOperation(
+    () => rpc.getCompressedAccount(bn(address.toBytes())),
+    3,
+    1000,
+    "getCompressedAccount"
+  );
+
+  let proof = await rpc.getValidityProofV0(
+    [
+      {
+        hash: compressed_account.hash,
+        tree: ADDRESS_TREE,
+        queue: ADDRESS_QUEUE,
+      },
+    ],
+    []
+  );
+
   const validityProof = proof.compressedProof;
+
+  const escrow_data = parseEscrowFromBuffer(compressed_account.data.data);
 
   const instruction = await program.methods
     .fillWsolOrder({
@@ -154,6 +192,7 @@ export async function fill_wsol(
     .remainingAccounts([...CLOSE_ACCOUNTS, ...accounts])
     .instruction();
 
+  // TODO: add light accounts alt here
   const altLookups = await Promise.all(
     alt.map(async (address: any) => {
       const alt = await rpc.getAddressLookupTable(new PublicKey(address));

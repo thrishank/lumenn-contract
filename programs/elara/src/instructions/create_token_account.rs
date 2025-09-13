@@ -100,7 +100,7 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::TokenAccountAlreadyExists));
     };
 
-    // NOTE: if input mint is WSOL then no need the swap
+    // NOTE: if input mint is WSOL then no need to swap
     if ctx.accounts.input_mint.key() == SOL_MINT {
         return Err(error!(CustomError::InvalidCreateAtaInstruction));
     }

@@ -95,7 +95,7 @@ pub fn expire<'info>(
             ctx.accounts.maker.key().as_ref(),
         ],
         &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
-            .expect("Invalid merkle tree pubkey"),
+            .map_err(|_| CustomError::InvalidMerkleTreePubkey)?,
         &crate::ID,
     );
 
@@ -133,7 +133,8 @@ pub fn expire<'info>(
         return Err(CustomError::OrderNotExpired.into());
     }
 
-    if address != escrow.address().expect("Invalid escrow address") {
+    let escrow_addr = escrow.address().ok_or(error!(CustomError::InvalidEscrow))?;
+    if address != escrow_addr {
         return Err(error!(CustomError::InvalidEscrow));
     }
 
@@ -162,6 +163,7 @@ pub fn expire<'info>(
 
     let signer_seeds: [&[&[u8]]; 1] = [&[b"protocol_vault", &[ctx.bumps.protocol_vault]]];
 
+    // creating the token program wsol mint no need to worry about token 2022. ATA_CREATION_AMOUNT is constant
     let temp_amount = escrow_account
         .amount
         .making_amount
@@ -220,7 +222,7 @@ pub fn expire<'info>(
         unique_id: escrow_account.unique_id,
         is_expired: true,
         cancelled_by: ctx.accounts.payer.key(),
-        timestamp: escrow_account.expired_at,
+        timestamp: current_timestamp,
     });
 
     Ok(())

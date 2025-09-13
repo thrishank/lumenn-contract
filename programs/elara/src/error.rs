@@ -102,4 +102,7 @@ pub enum CustomError {
 
     #[msg("Token account is not empty")]
     TokenAccountNotEmpty,
+
+    #[msg("Mekle Tree pubkey is invalid")]
+    InvalidMerkleTreePubkey,
 }

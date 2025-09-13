@@ -1,22 +1,41 @@
-import { Escrow } from "../tests/utils/fn";
-import {
-  CompressedAccountWithMerkleContext,
-  ValidityProofWithContext,
-} from "@lightprotocol/stateless.js";
+import { parseEscrowFromBuffer } from "../tests/utils/fn";
+import { bn } from "@lightprotocol/stateless.js";
 import { payer, program, rpc } from "./app";
 import {
   ComputeBudgetProgram,
+  PublicKey,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { CLOSE_ACCOUNTS } from "../tests/utils/address";
+import {
+  ADDRESS_QUEUE,
+  ADDRESS_TREE,
+  CLOSE_ACCOUNTS,
+} from "../tests/utils/address";
+import { retryOperation } from "./utils";
 
-export async function expire(
-  compressed_account: CompressedAccountWithMerkleContext,
-  escrow_data: Escrow,
-  proof: ValidityProofWithContext
-) {
+export async function expire(address: PublicKey) {
+  let compressed_account = await retryOperation(
+    () => rpc.getCompressedAccount(bn(address.toBytes())),
+    3,
+    1000,
+    "getCompressedAccount"
+  );
+
+  const proof = await rpc.getValidityProofV0(
+    [
+      {
+        hash: compressed_account.hash,
+        tree: ADDRESS_TREE,
+        queue: ADDRESS_QUEUE,
+      },
+    ],
+    []
+  );
+
   const validityProof = proof.compressedProof;
+
+  const escrow_data = parseEscrowFromBuffer(compressed_account.data.data);
 
   const instruction = await program.methods
     .cancelOrder({
@@ -74,12 +93,25 @@ export async function expire(
   return tx;
 }
 
-export async function expire_wsol(
-  compressed_account: CompressedAccountWithMerkleContext,
-  escrow_data: Escrow,
-  proof: ValidityProofWithContext
-) {
+export async function expire_wsol(address: PublicKey) {
+  const compressed_account = await rpc.getCompressedAccount(
+    bn(address.toBytes())
+  );
+
+  const proof = await rpc.getValidityProofV0(
+    [
+      {
+        hash: compressed_account.hash,
+        tree: ADDRESS_TREE,
+        queue: ADDRESS_QUEUE,
+      },
+    ],
+    []
+  );
+
   const validityProof = proof.compressedProof;
+
+  const escrow_data = parseEscrowFromBuffer(compressed_account.data.data);
 
   const instruction = await program.methods
     .expireWsolOrder({

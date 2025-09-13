@@ -1,4 +1,8 @@
-import { bn } from "@lightprotocol/stateless.js";
+import {
+  bn,
+  CompressedAccountWithMerkleContext,
+  ValidityProofWithContext,
+} from "@lightprotocol/stateless.js";
 import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
@@ -12,18 +16,17 @@ import {
   ADDRESS_TREE,
   CLOSE_ACCOUNTS,
 } from "../tests/utils/address";
-import { parseEscrowFromBuffer } from "../tests/utils/fn";
+import { Escrow, parseEscrowFromBuffer } from "../tests/utils/fn";
 import { get_swap_instruction } from "./jup";
 import BN from "bn.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 
 const sol_mint = new PublicKey("So11111111111111111111111111111111111111112");
 
-export async function create_ata(address: PublicKey) {
-  let compressed_account = await rpc.getCompressedAccount(
-    bn(address.toBytes())
-  );
-
+export async function create_ata(
+  compressed_account: CompressedAccountWithMerkleContext,
+  escrow_data: Escrow
+) {
   let hash = compressed_account.hash;
 
   let proof = await rpc.getValidityProofV0(
@@ -32,9 +35,6 @@ export async function create_ata(address: PublicKey) {
   );
 
   const validityProof = proof.compressedProof;
-
-  const buffer = compressed_account?.data?.data!;
-  let escrow_data = parseEscrowFromBuffer(buffer);
 
   if (escrow_data.tokens.inputMint === sol_mint) {
     throw new Error("call create wSOL instruction");
@@ -114,7 +114,6 @@ export async function create_ata(address: PublicKey) {
       payer: payer.publicKey,
       payerWsolAta: payer_ata,
       maker: escrow_data.maker,
-      makerTokenAta: ata,
       protocolWsolAta: protocol_ata,
       inputMint: escrow_data.tokens.inputMint,
       outputMint: escrow_data.tokens.outputMint,
@@ -158,11 +157,10 @@ export async function create_ata(address: PublicKey) {
   return signature;
 }
 
-export async function create_ata_wsol(address: PublicKey) {
-  let compressed_account = await rpc.getCompressedAccount(
-    bn(address.toBytes())
-  );
-
+export async function create_ata_wsol(
+  compressed_account: CompressedAccountWithMerkleContext,
+  escrow_data: Escrow
+) {
   let hash = compressed_account.hash;
 
   let proof = await rpc.getValidityProofV0(
@@ -171,9 +169,6 @@ export async function create_ata_wsol(address: PublicKey) {
   );
 
   const validityProof = proof.compressedProof;
-
-  const buffer = compressed_account?.data?.data!;
-  let escrow_data = parseEscrowFromBuffer(buffer);
 
   if (escrow_data.tokens.inputMint != sol_mint) {
     throw new Error("call create ata instruction");
@@ -200,14 +195,7 @@ export async function create_ata_wsol(address: PublicKey) {
     .createAtaWsol({
       swapData: Buffer.from(instruction_data, "base64"),
       escrowAccount: {
-        maker: escrow_data.maker,
         uniqueId: escrow_data.uniqueId,
-        tokens: {
-          inputMint: escrow_data.tokens.inputMint,
-          outputMint: escrow_data.tokens.outputMint,
-          inputTokenProgram: escrow_data.tokens.inputTokenProgram,
-          outputTokenProgram: escrow_data.tokens.outputTokenProgram,
-        },
         amount: {
           makingAmount: escrow_data.amount.makingAmount,
           takingAmount: escrow_data.amount.takingAmount,
@@ -242,7 +230,8 @@ export async function create_ata_wsol(address: PublicKey) {
       payer: payer.publicKey,
       maker: escrow_data.maker,
       outputMint: escrow_data.tokens.outputMint,
-      tokenProgram: escrow_data.tokens.inputTokenProgram,
+      inputTokenProgram: escrow_data.tokens.inputTokenProgram,
+      outputTokenProgram: escrow_data.tokens.outputTokenProgram,
     })
     .remainingAccounts(CLOSE_ACCOUNTS)
     .instruction();

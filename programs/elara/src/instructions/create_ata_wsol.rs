@@ -93,20 +93,15 @@ pub fn create_token_account<'info>(
     let ata_creation_amount =
         rent.minimum_balance(ctx.accounts.maker_token_ata.to_account_info().data_len());
 
+    // taking amount need to sub the
     if jup_data.out_amount != ata_creation_amount {
         return Err(error!(CustomError::InvalidOutAmount));
     }
 
+    // here we are checking how much ouput mint amount needed to sub for the equivlanet ata
+    // creation amount
     if !jup_data.is_exact_out {
         return Err(error!(CustomError::InvalidJupInstructionData));
-    }
-
-    if jup_data.slippage_bps > 101 {
-        return Err(error!(CustomError::SlippageTooHigh));
-    }
-
-    if jup_data.platform_fee_bps != 0 {
-        return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
     transfer_sol_from_vault(&ctx, ata_creation_amount)?;

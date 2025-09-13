@@ -33,7 +33,7 @@ import {
   CLOSE_ACCOUNTS,
   INIT_REMAINING_ACCOUNTS,
 } from "../utils/address";
-import { parseEscrowFromBuffer } from "../utils/fn";
+import { calculateTransactionSize, parseEscrowFromBuffer } from "../utils/fn";
 
 import { assert } from "chai";
 import { assertEscrowDoesNotExist } from "../utils/check";
@@ -234,12 +234,27 @@ describe("elara/expire_order", () => {
         outputTokenProgram: TOKEN_PROGRAM_ID,
       })
       .remainingAccounts(CLOSE_ACCOUNTS)
-      .preInstructions([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-      ])
-      .rpc();
+      .preInstructions([])
+      .instruction();
 
-    console.log("Order expired signature:", tx1);
+    const message = new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: latestBlockhash.blockhash,
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+        tx1,
+      ],
+    }).compileToV0Message();
+
+    const tx2 = new VersionedTransaction(message);
+    tx2.sign([payer]);
+    const size = calculateTransactionSize(tx2);
+    console.log(size);
+
+    const sig = await rpc.sendTransaction(tx2);
+    console.log("Order initialized signature:", sig);
+
+    await new Promise((r) => setTimeout(r, 5000));
 
     const sol_balance_after = await rpc.getBalance(
       maker.publicKey,

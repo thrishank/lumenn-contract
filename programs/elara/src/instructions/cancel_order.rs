@@ -85,7 +85,7 @@ pub fn cancel<'info>(
             ctx.accounts.maker.key().as_ref(),
         ],
         &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
-            .expect("Invalid merkle tree pubkey"),
+            .map_err(|_| CustomError::InvalidMerkleTreePubkey)?,
         &crate::ID,
     );
 
@@ -151,7 +151,8 @@ pub fn cancel<'info>(
         return Err(error!(CustomError::ExpireWSolInstruction));
     }
 
-    if address != escrow.address().expect("Invalid escrow address") {
+    let escrow_addr = escrow.address().ok_or(error!(CustomError::InvalidEscrow))?;
+    if address != escrow_addr {
         return Err(error!(CustomError::InvalidEscrow));
     }
 
