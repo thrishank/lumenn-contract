@@ -113,9 +113,8 @@ pub fn fill<'info>(
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
-    // hard coded 0.05%
-    // TODO: change this
-    if jup_data.platform_fee_bps != 5 {
+    // hard coded 0.1%
+    if jup_data.platform_fee_bps != 10 {
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 

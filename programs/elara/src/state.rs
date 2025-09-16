@@ -16,8 +16,6 @@ pub struct EscrowAccount {
     pub fee_bps: u16,
 }
 
-// TODO: remove fee, ori amounts -> 20 bytes saved
-
 #[derive(
     Debug, Clone, Copy, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher,
 )]

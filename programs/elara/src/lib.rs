@@ -21,11 +21,11 @@ use instructions::*;
 use crate::error::CustomError;
 
 solana_security_txt::security_txt! {
-    name: "Limit Order Program V1",
+    name: "Lumenn Limit Order Program V1",
     contacts: "thris.dev@gmail.com",
     source_code: "https://github.com/thrishank/elara",
-    project_url: "https://github.com/thrishank/elara",
-    policy: "",
+    project_url: "https://lumenn.xyz/",
+    policy: "https://github.com/thrishank/elara/SECURITY.md",
     preferred_languages: "en"
 }
 
