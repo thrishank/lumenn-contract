@@ -120,6 +120,10 @@ pub fn fill<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
+    if !jup_data.is_exact_out {
+        return Err(error!(CustomError::InvalidJupInstructionData));
+    }
+
     // let jupiter_accounts = &remaining[10..];
 
     // validate_jupiter_accounts(
@@ -143,10 +147,6 @@ pub fn fill<'info>(
 
     match args.fill_type {
         FillType::Full => {
-            if !jup_data.is_exact_out {
-                return Err(error!(CustomError::InvalidJupInstructionData));
-            }
-
             if in_amount != escrow_account.amount.making_amount {
                 return Err(error!(CustomError::InvalidInAmount));
             }
@@ -156,56 +156,6 @@ pub fn fill<'info>(
             }
 
             let escrow_address = light_cpi_close(&ctx, args, light_accounts)?;
-
-            let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
-
-            transfer_checked(
-                CpiContext::new_with_signer(
-                    ctx.accounts.output_token_program.to_account_info(),
-                    TransferChecked {
-                        from: ctx
-                            .accounts
-                            .protocol_vault_output_mint_ata
-                            .to_account_info(),
-                        to: ctx.accounts.temp_wsol_ata.to_account_info(),
-                        authority: ctx.accounts.protocol_vault.to_account_info(),
-                        mint: ctx.accounts.sol_mint.to_account_info(),
-                    },
-                    signer_seeds,
-                ),
-                out_amount - ata_creation_amount,
-                ctx.accounts.sol_mint.decimals,
-            )?;
-
-            transfer_checked(
-                CpiContext::new_with_signer(
-                    ctx.accounts.output_token_program.to_account_info(),
-                    TransferChecked {
-                        from: ctx
-                            .accounts
-                            .protocol_vault_output_mint_ata
-                            .to_account_info(),
-                        to: ctx.accounts.payer_wsol_ata.to_account_info(),
-                        mint: ctx.accounts.sol_mint.to_account_info(),
-                        authority: ctx.accounts.protocol_vault.to_account_info(),
-                    },
-                    signer_seeds,
-                ),
-                ata_creation_amount,
-                ctx.accounts.sol_mint.decimals,
-            )?;
-
-            let temp_signer_seeds: [&[&[u8]]; 1] = [&[b"temp_account", &[ctx.bumps.temp_account]]];
-
-            close_account(CpiContext::new_with_signer(
-                ctx.accounts.output_token_program.to_account_info(),
-                CloseAccount {
-                    account: ctx.accounts.temp_wsol_ata.to_account_info(),
-                    destination: ctx.accounts.maker.to_account_info(),
-                    authority: ctx.accounts.temp_account.to_account_info(),
-                },
-                &temp_signer_seeds,
-            ))?;
 
             emit!(FillEvent {
                 escrow_address,
@@ -220,67 +170,24 @@ pub fn fill<'info>(
             });
         }
         FillType::Partial => {
-            require!(
-                !jup_data.is_exact_out,
-                CustomError::InvalidJupInstructionData
-            );
-
             if in_amount > escrow_account.amount.making_amount {
                 return Err(ProgramError::InsufficientFunds.into());
             }
 
+            let taking_amount = escrow_account
+                .amount
+                .taking_amount
+                .checked_mul(in_amount)
+                .ok_or(ProgramError::ArithmeticOverflow)?
+                .checked_div(escrow_account.amount.making_amount)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+
+            if out_amount < taking_amount {
+                return Err(error!(CustomError::LowTakingAmount));
+            }
+
             let escrow_address =
                 light_cpi_update(&ctx, light_accounts, &args, in_amount, out_amount)?;
-
-            let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
-
-            transfer_checked(
-                CpiContext::new_with_signer(
-                    ctx.accounts.output_token_program.to_account_info(),
-                    TransferChecked {
-                        from: ctx
-                            .accounts
-                            .protocol_vault_output_mint_ata
-                            .to_account_info(),
-                        to: ctx.accounts.temp_wsol_ata.to_account_info(),
-                        authority: ctx.accounts.protocol_vault.to_account_info(),
-                        mint: ctx.accounts.sol_mint.to_account_info(),
-                    },
-                    signer_seeds,
-                ),
-                out_amount - ata_creation_amount,
-                ctx.accounts.sol_mint.decimals,
-            )?;
-
-            transfer_checked(
-                CpiContext::new_with_signer(
-                    ctx.accounts.output_token_program.to_account_info(),
-                    TransferChecked {
-                        from: ctx
-                            .accounts
-                            .protocol_vault_output_mint_ata
-                            .to_account_info(),
-                        to: ctx.accounts.payer_wsol_ata.to_account_info(),
-                        mint: ctx.accounts.sol_mint.to_account_info(),
-                        authority: ctx.accounts.protocol_vault.to_account_info(),
-                    },
-                    signer_seeds,
-                ),
-                ata_creation_amount,
-                ctx.accounts.sol_mint.decimals,
-            )?;
-
-            let temp_signer_seeds: [&[&[u8]]; 1] = [&[b"temp_account", &[ctx.bumps.temp_account]]];
-
-            close_account(CpiContext::new_with_signer(
-                ctx.accounts.output_token_program.to_account_info(),
-                CloseAccount {
-                    account: ctx.accounts.temp_wsol_ata.to_account_info(),
-                    destination: ctx.accounts.maker.to_account_info(),
-                    authority: ctx.accounts.temp_account.to_account_info(),
-                },
-                &temp_signer_seeds,
-            ))?;
 
             emit!(FillEvent {
                 escrow_address,
@@ -289,12 +196,62 @@ pub fn fill<'info>(
                 output_mint: ctx.accounts.sol_mint.key(),
                 unique_id: escrow_account.unique_id,
                 in_amount,
-                out_amount: escrow_account.amount.taking_amount,
+                out_amount,
                 fee_bps: escrow_account.fee_bps,
                 fill_type: FillType::Partial,
             });
         }
     }
+
+    let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
+
+    transfer_checked(
+        CpiContext::new_with_signer(
+            ctx.accounts.output_token_program.to_account_info(),
+            TransferChecked {
+                from: ctx
+                    .accounts
+                    .protocol_vault_output_mint_ata
+                    .to_account_info(),
+                to: ctx.accounts.temp_wsol_ata.to_account_info(),
+                authority: ctx.accounts.protocol_vault.to_account_info(),
+                mint: ctx.accounts.sol_mint.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        out_amount - ata_creation_amount,
+        ctx.accounts.sol_mint.decimals,
+    )?;
+
+    transfer_checked(
+        CpiContext::new_with_signer(
+            ctx.accounts.output_token_program.to_account_info(),
+            TransferChecked {
+                from: ctx
+                    .accounts
+                    .protocol_vault_output_mint_ata
+                    .to_account_info(),
+                to: ctx.accounts.payer_wsol_ata.to_account_info(),
+                mint: ctx.accounts.sol_mint.to_account_info(),
+                authority: ctx.accounts.protocol_vault.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        ata_creation_amount,
+        ctx.accounts.sol_mint.decimals,
+    )?;
+
+    let temp_signer_seeds: [&[&[u8]]; 1] = [&[b"temp_account", &[ctx.bumps.temp_account]]];
+
+    close_account(CpiContext::new_with_signer(
+        ctx.accounts.output_token_program.to_account_info(),
+        CloseAccount {
+            account: ctx.accounts.temp_wsol_ata.to_account_info(),
+            destination: ctx.accounts.maker.to_account_info(),
+            authority: ctx.accounts.temp_account.to_account_info(),
+        },
+        &temp_signer_seeds,
+    ))?;
 
     Ok(())
 }
@@ -313,7 +270,7 @@ fn light_cpi_close<'info>(
             ctx.accounts.maker.key().as_ref(),
         ],
         &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
-            .expect("Invalid merkle tree pubkey"),
+            .map_err(|_| CustomError::InvalidMerkleTreePubkey)?,
         &crate::ID,
     );
 
@@ -391,7 +348,7 @@ pub fn light_cpi_update<'info>(
             ctx.accounts.maker.key().as_ref(),
         ],
         &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
-            .expect("Invalid merkle tree pubkey"),
+            .map_err(|_| CustomError::InvalidMerkleTreePubkey)?,
         &crate::ID,
     );
 

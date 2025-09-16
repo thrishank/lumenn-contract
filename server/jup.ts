@@ -85,6 +85,7 @@ export async function get_price(input_mint: string, output_mint: string) {
   return { current_ratio, inputPrice, outputPrice };
 }
 
+// TODO: improve this do binary search
 export async function determineFillType(
   escrow_data: Escrow,
   inputMint: PublicKey,

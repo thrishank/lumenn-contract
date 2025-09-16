@@ -101,9 +101,9 @@ pub mod elara {
     }
 
     /// fill the order when the price reaches the user target
-    /// this instruction will be called a worker that is monitoring the price
-    /// swap the token in vault using jupiter cpi
-    /// close the light compressed escrow account
+    /// this instruction will be called by a worker that is monitoring the price
+    /// swap's the token in vault using jupiter cpi
+    /// close or update the light compressed escrow account
     /// transfer the output tokens to the maker
     #[instruction(discriminator = [2])]
     pub fn fill_order<'info>(

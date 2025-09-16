@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{ops::Div, str::FromStr};
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -31,7 +31,7 @@ pub struct FillOrder<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// CHECK: check maker.key == order.maker
+    /// CHECK: Light CPI Checks
     #[account(mut)]
     pub maker: UncheckedAccount<'info>,
 
@@ -177,6 +177,18 @@ pub fn fill<'info>(
                 return Err(ProgramError::InsufficientFunds.into());
             }
 
+            let taking_amount = escrow_account
+                .amount
+                .taking_amount
+                .checked_mul(in_amount)
+                .ok_or(ProgramError::ArithmeticOverflow)?
+                .checked_div(escrow_account.amount.making_amount)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+
+            if out_amount < taking_amount {
+                return Err(error!(CustomError::LowTakingAmount));
+            }
+
             let escrow_address =
                 light_cpi_update(&ctx, light_accounts, &args, in_amount, out_amount)?;
 
@@ -242,7 +254,7 @@ fn light_cpi_close<'info>(
             ctx.accounts.maker.key().as_ref(),
         ],
         &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
-            .expect("Invalid merkle tree pubkey"),
+            .map_err(|_| CustomError::InvalidMerkleTreePubkey)?,
         &crate::ID,
     );
 
@@ -320,7 +332,7 @@ pub fn light_cpi_update<'info>(
             ctx.accounts.maker.key().as_ref(),
         ],
         &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
-            .expect("Invalid merkle tree pubkey"),
+            .map_err(|_| CustomError::InvalidMerkleTreePubkey)?,
         &crate::ID,
     );
 

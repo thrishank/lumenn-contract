@@ -107,15 +107,15 @@ pub fn update<'info>(
         }
     }
 
-    let escrow_address = light_cpi(&ctx, ctx.remaining_accounts, &args)?;
-
     if let Some(new_making) = args.making_amount {
         let old_making = args.escrow_account.amount.making_amount;
 
         match new_making.cmp(&old_making) {
             core::cmp::Ordering::Equal => {}
             core::cmp::Ordering::Greater => {
-                let diff = new_making - old_making;
+                let diff = new_making
+                    .checked_sub(old_making)
+                    .ok_or(ProgramError::ArithmeticOverflow)?;
 
                 // Transfer the difference from the maker to the protocol vault
 
@@ -134,7 +134,9 @@ pub fn update<'info>(
                 )?;
             }
             core::cmp::Ordering::Less => {
-                let diff = old_making - new_making;
+                let diff = old_making
+                    .checked_sub(new_making)
+                    .ok_or(ProgramError::ArithmeticOverflow)?;
 
                 // Transfer the difference from the protocol vault to the maker
 
@@ -158,6 +160,8 @@ pub fn update<'info>(
             }
         }
     }
+
+    let escrow_address = light_cpi(&ctx, ctx.remaining_accounts, &args)?;
 
     emit!(OrderUpdateEvent {
         escrow_address,
@@ -198,7 +202,7 @@ fn light_cpi<'info>(
             ctx.accounts.maker.key().as_ref(),
         ],
         &Pubkey::from_str("amt1Ayt45jfbdw5YSo7iz6WZxUmnZsQTYXy82hVwyC2")
-            .expect("Invalid merkle tree pubkey"),
+            .map_err(|_| CustomError::InvalidMerkleTreePubkey)?,
         &crate::ID,
     );
 
