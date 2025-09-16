@@ -25,7 +25,7 @@ solana_security_txt::security_txt! {
     contacts: "thris.dev@gmail.com",
     source_code: "https://github.com/thrishank/elara",
     project_url: "https://lumenn.xyz/",
-    policy: "https://github.com/thrishank/elara/SECURITY.md",
+    policy: "https://github.com/thrishank/elara/blob/main/SECURITY.md",
     preferred_languages: "en"
 }
 

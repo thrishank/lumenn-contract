@@ -84,7 +84,8 @@ pub struct CreateToken<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct CreateTokenAccountArgs {
     pub swap_data: Vec<u8>,
-    pub taking_amount: u64,
+    pub taking_amount: u64, // NOTE: not fully decentalized. Even if this data is corrupted, when
+    // doing the final swap we just check out amount > taking amount. So no big problem here
     pub escrow_account: AccountParams,
     pub proof: ValidityProof,
     pub tree_info: PackedStateTreeInfo,
@@ -116,21 +117,20 @@ pub fn create_token_account<'info>(
     let ata_creation_amount =
         rent.minimum_balance(ctx.accounts.maker_token_ata.to_account_info().data_len());
 
-    if !jup_data.is_exact_out {
-        if jup_data.out_amount != ata_creation_amount {
-            return Err(error!(CustomError::InvalidOutAmount));
-        } else {
-            // NOTE: Token 2022 doesn't have ExactOut Routes
-            if jup_data.out_amount < ata_creation_amount {
-                return Err(error!(CustomError::InvalidOutAmount));
-            }
+    if jup_data.is_exact_out && jup_data.out_amount != ata_creation_amount {
+        return Err(error!(CustomError::InvalidOutAmount));
+    }
 
-            // 1000 lamports tolarance
-            if jup_data.out_amount > ata_creation_amount + 1000 {
-                return Err(error!(CustomError::InvalidOutAmount));
-            }
-            // TODO: if over transfer the diff to maker. Transaction size limit ?
+    if !jup_data.is_exact_out {
+        if jup_data.out_amount < ata_creation_amount {
+            return Err(error!(CustomError::InvalidOutAmount));
         }
+
+        // 1000 lamports tolarance
+        if jup_data.out_amount > ata_creation_amount + 1000 {
+            return Err(error!(CustomError::InvalidOutAmount));
+        }
+        // TODO: if over transfer the diff to maker. Transaction size limit ?
     }
 
     if jup_data.slippage_bps != 0 {

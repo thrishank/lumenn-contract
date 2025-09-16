@@ -18,10 +18,3 @@
 - expire - 1055 no ALT
 
 ## Create ATA
-
-1. if input mint is not SOL and output mint is not SOL
-   swap some amount of input mint to WSOL
-   in this swap data check outAmout == ATA_CREATION
-   then swap the tokens inside the protocol vault
-   send the swapped WSOL tokens from protocol to payer
-   sub the making amount from the order with inAmount(from the swap data)

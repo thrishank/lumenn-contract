@@ -43,7 +43,7 @@ export async function get_swap_instruction() {
     new PublicKey("9RzWC4ZS6LdNUP2LwaY7Ztq5sTxgt3dFLp2jjokhm9Vz"),
     fee_pubkey
   );
-  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=So11111111111111111111111111111111111111112&amount=2039280&feeAccount=${ata.toString()}`;
+  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=So11111111111111111111111111111111111111112&amount=20392800000000&feeAccount=${ata.toString()}`;
 
   const quote = await axios.get(quote_url);
   let config = {

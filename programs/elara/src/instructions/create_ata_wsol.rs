@@ -22,7 +22,7 @@ pub struct CreateTokenWsol<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// CHECK: This account is the owner of the new token account
+    /// CHECK: LIGHT Proof verfication check this account
     pub maker: AccountInfo<'info>,
 
     #[account(address = spl_token::native_mint::ID)]
@@ -87,6 +87,11 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::InvalidOutputMint));
     };
 
+    validate_light_accounts(
+        ctx.remaining_accounts,
+        &expected_accounts(LightAccountSet::Update),
+    )?;
+
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
     let rent = Rent::get()?;
@@ -98,24 +103,16 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::InvalidOutAmount));
     }
 
-    // here we are checking how much ouput mint amount needed to sub for the equivlanet ata
-    // creation amount
-    if !jup_data.is_exact_out {
-        return Err(error!(CustomError::InvalidJupInstructionData));
-    }
-
     transfer_sol_from_vault(&ctx, ata_creation_amount)?;
 
-    light_cpi(&ctx, &args, jup_data.in_amount, ata_creation_amount)
-
-    // ata created in the accounts macro
+    light_cpi(&ctx, &args, ata_creation_amount, jup_data.in_amount)
 }
 
 fn light_cpi<'info>(
     ctx: &Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
     args: &CreateTokenAccountWsolArgs,
-    amount_swapped: u64,
     ata_creation_amount: u64,
+    amount_swapped: u64,
 ) -> Result<()> {
     let escrow_account = args.escrow_account;
 
@@ -146,17 +143,11 @@ fn light_cpi<'info>(
         .checked_sub(ata_creation_amount)
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
-    // NOTE: calculate the equivalent taking amount and subtract it from the state
     escrow.amount.taking_amount = escrow
         .amount
         .taking_amount
         .checked_sub(amount_swapped)
         .ok_or(ProgramError::ArithmeticOverflow)?;
-
-    validate_light_accounts(
-        ctx.remaining_accounts,
-        &expected_accounts(LightAccountSet::Update),
-    )?;
 
     let cpi_accounts = light_sdk::cpi::CpiAccounts::new(
         ctx.accounts.payer.as_ref(),
