@@ -20,7 +20,7 @@ use crate::{
     instructions::{CancelOrderParams, OrderCancelled},
     state::{EscrowAccount, Tokens},
     utils::{expected_accounts, validate_light_accounts, LightAccountSet},
-    ATA_CREATION_AMOUNT,
+    TOKEN_ACCOUNT_SIZE,
 };
 
 #[derive(Accounts)]
@@ -163,11 +163,14 @@ pub fn expire<'info>(
 
     let signer_seeds: [&[&[u8]]; 1] = [&[b"protocol_vault", &[ctx.bumps.protocol_vault]]];
 
-    // creating the token program wsol mint no need to worry about token 2022. ATA_CREATION_AMOUNT is constant
+    let rent = Rent::get()?;
+    let ata_creation_amount = rent.minimum_balance(TOKEN_ACCOUNT_SIZE as usize);
+
+    // creating the token program wsol mint no need to worry about token 2022. wsol not token22
     let temp_amount = escrow_account
         .amount
         .making_amount
-        .checked_sub(ATA_CREATION_AMOUNT)
+        .checked_sub(ata_creation_amount)
         .ok_or(CustomError::InvalidAmount)?;
 
     transfer_checked(
@@ -196,7 +199,7 @@ pub fn expire<'info>(
             },
             &signer_seeds,
         ),
-        ATA_CREATION_AMOUNT,
+        ata_creation_amount,
         ctx.accounts.sol_mint.decimals,
     )?;
 

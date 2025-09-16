@@ -116,16 +116,24 @@ pub fn create_token_account<'info>(
     let ata_creation_amount =
         rent.minimum_balance(ctx.accounts.maker_token_ata.to_account_info().data_len());
 
-    if jup_data.out_amount != ata_creation_amount {
-        return Err(error!(CustomError::InvalidOutAmount));
-    }
-
     if !jup_data.is_exact_out {
-        return Err(error!(CustomError::InvalidJupInstructionData));
+        if jup_data.out_amount != ata_creation_amount {
+            return Err(error!(CustomError::InvalidOutAmount));
+        } else {
+            // NOTE: Token 2022 doesn't have ExactOut Routes
+            if jup_data.out_amount < ata_creation_amount {
+                return Err(error!(CustomError::InvalidOutAmount));
+            }
+
+            // 1000 lamports tolarance
+            if jup_data.out_amount > ata_creation_amount + 1000 {
+                return Err(error!(CustomError::InvalidOutAmount));
+            }
+            // TODO: if over transfer the diff to maker. Transaction size limit ?
+        }
     }
 
-    // TODO: make this 0
-    if jup_data.slippage_bps > 101 {
+    if jup_data.slippage_bps != 0 {
         return Err(error!(CustomError::SlippageTooHigh));
     }
 

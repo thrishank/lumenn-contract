@@ -20,7 +20,7 @@ use crate::{
     utils::{
         expected_accounts, validate_jupiter_accounts, validate_light_accounts, LightAccountSet,
     },
-    ATA_CREATION_AMOUNT, PROTOCOL_VAULT_SEED,
+    PROTOCOL_VAULT_SEED, TOKEN_ACCOUNT_SIZE,
 };
 
 use jupiter::program::Jupiter;
@@ -138,6 +138,9 @@ pub fn fill<'info>(
     //     &ctx.accounts.jupiter_program,
     // )?;
 
+    let rent = Rent::get()?;
+    let ata_creation_amount = rent.minimum_balance(TOKEN_ACCOUNT_SIZE as usize);
+
     match args.fill_type {
         FillType::Full => {
             if !jup_data.is_exact_out {
@@ -170,7 +173,7 @@ pub fn fill<'info>(
                     },
                     signer_seeds,
                 ),
-                out_amount - ATA_CREATION_AMOUNT,
+                out_amount - ata_creation_amount,
                 ctx.accounts.sol_mint.decimals,
             )?;
 
@@ -188,7 +191,7 @@ pub fn fill<'info>(
                     },
                     signer_seeds,
                 ),
-                ATA_CREATION_AMOUNT,
+                ata_creation_amount,
                 ctx.accounts.sol_mint.decimals,
             )?;
 
@@ -245,7 +248,7 @@ pub fn fill<'info>(
                     },
                     signer_seeds,
                 ),
-                out_amount - ATA_CREATION_AMOUNT,
+                out_amount - ata_creation_amount,
                 ctx.accounts.sol_mint.decimals,
             )?;
 
@@ -263,7 +266,7 @@ pub fn fill<'info>(
                     },
                     signer_seeds,
                 ),
-                ATA_CREATION_AMOUNT,
+                ata_creation_amount,
                 ctx.accounts.sol_mint.decimals,
             )?;
 

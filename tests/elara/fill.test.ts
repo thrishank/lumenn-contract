@@ -77,8 +77,8 @@ describe("elara/fill_order", () => {
 
   const assetSeed = deriveAddressSeed(seeds, program.programId);
   const address = deriveAddress(assetSeed, ADDRESS_TREE);
-
   /*
+
   it("fill order", async () => {
     console.log("Initializing order...");
 
@@ -463,17 +463,12 @@ describe("elara/fill_order", () => {
       .remainingAccounts([...CLOSE_ACCOUNTS, ...jup_accounts])
       .instruction();
 
-    const altAddresse = await Promise.all(
-      alt.map(async (key: string) => {
-        const newAlt = await clone_alt(key);
-        return newAlt;
-      })
-    );
+    const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5"];
 
-    const altAddresses = [
-      "7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5",
-      ...altAddresse,
-    ];
+    for (const key of alt) {
+      const newAlt = await clone_alt(key);
+      altAddresses.push(newAlt);
+    }
 
     const altLookups = await Promise.all(
       altAddresses.map(async (address: any) => {

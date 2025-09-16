@@ -1,8 +1,4 @@
-import {
-  bn,
-  CompressedAccountWithMerkleContext,
-  ValidityProofWithContext,
-} from "@lightprotocol/stateless.js";
+import { CompressedAccountWithMerkleContext } from "@lightprotocol/stateless.js";
 import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
@@ -16,10 +12,11 @@ import {
   ADDRESS_TREE,
   CLOSE_ACCOUNTS,
 } from "../tests/utils/address";
-import { Escrow, parseEscrowFromBuffer } from "../tests/utils/fn";
+import { Escrow } from "../tests/utils/fn";
 import { get_swap_instruction } from "./jup";
 import BN from "bn.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { get_rent_quote } from "./token-2022";
 
 const sol_mint = new PublicKey("So11111111111111111111111111111111111111112");
 
@@ -50,20 +47,53 @@ export async function create_ata(
     throw new Error("ATA already exists");
   }
 
-  const { inAmount, outAmount, instruction_data, accounts, alt } =
-    await get_swap_instruction(
+  let instruction_data;
+  let accounts;
+  let alt;
+  let taking_amount;
+
+  try {
+    const result = await get_swap_instruction(
       escrow_data.tokens.inputMint.toString(),
       sol_mint.toString(),
       2039280,
       "ExactOut"
     );
 
-  const { inAmount: taking_amount } = await get_swap_instruction(
-    escrow_data.tokens.outputMint.toString(),
-    sol_mint.toString(),
-    2039280,
-    "ExactOut"
-  );
+    const { inAmount } = await get_swap_instruction(
+      escrow_data.tokens.outputMint.toString(),
+      sol_mint.toString(),
+      2039280,
+      "ExactOut"
+    );
+    instruction_data = result.instruction_data;
+    accounts = result.accounts;
+    alt = result.alt;
+    taking_amount = inAmount;
+  } catch (err) {
+    const amounts = await get_rent_quote(escrow_data.tokens.inputMint);
+
+    const result = await get_swap_instruction(
+      escrow_data.tokens.inputMint.toString(),
+      sol_mint.toString(),
+      Number(amounts.inAmount),
+      "ExactIn"
+    );
+
+    if (
+      result.outAmount - amounts.rent > 0 &&
+      result.outAmount - amounts.rent < 1000
+    ) {
+      throw new Error("Tolarance too high");
+    }
+
+    const { inAmount } = await get_rent_quote(escrow_data.tokens.outputMint);
+
+    instruction_data = result.instruction_data;
+    accounts = result.accounts;
+    alt = result.alt;
+    taking_amount = inAmount;
+  }
 
   const payer_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
 

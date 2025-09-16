@@ -2,6 +2,24 @@ import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
 import { Escrow } from "../tests/utils/fn";
 
+export async function get_quote(
+  input_mint: string,
+  output_mint: string,
+  amount: number
+): Promise<{ inAmount: string; outAmount: string }> {
+  const quote_url =
+    `https://lite-api.jup.ag/swap/v1/quote?` +
+    `inputMint=${input_mint}&outputMint=${output_mint}` +
+    `&amount=${amount}&slippageBps=0`;
+
+  const quote = await axios.get(quote_url);
+
+  return {
+    inAmount: quote.data.inAmount,
+    outAmount: quote.data.outAmount,
+  };
+}
+
 export async function get_swap_instruction(
   input_mint: string,
   output_mint: string,
@@ -83,7 +101,7 @@ export async function determineFillType(
   let divisor = 1;
 
   while (tryInAmount > 0 && tryTakingAmount > 0) {
-    const { inAmount, outAmount, instruction_data, accounts, alt } =
+    const { outAmount, instruction_data, accounts, alt } =
       await get_swap_instruction(
         inputMint.toString(),
         outputMint.toString(),

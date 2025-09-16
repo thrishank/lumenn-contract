@@ -184,17 +184,7 @@ describe("elara/create_token_account", () => {
       "So11111111111111111111111111111111111111112"
     );
 
-    console.log(swap);
-
     const { accounts: jup_accounts, alt } = await get_swap_instruction();
-    console.log(alt);
-
-    const altAddresse = await Promise.all(
-      alt.map(async (key: string) => {
-        const newAlt = await clone_alt(key);
-        return newAlt;
-      })
-    );
 
     const instruction = await program.methods
       .createAta({
@@ -248,10 +238,14 @@ describe("elara/create_token_account", () => {
       .remainingAccounts([...CLOSE_ACCOUNTS, ...jup_accounts])
       .instruction();
 
-    const altAddresses = [
-      "7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5",
-      ...altAddresse,
-    ];
+    console.log(alt);
+
+    const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5"];
+
+    for (const key of alt) {
+      const newAlt = await clone_alt(key);
+      altAddresses.push(newAlt);
+    }
 
     const altLookups = await Promise.all(
       altAddresses.map(async (address: any) => {
@@ -328,7 +322,6 @@ describe("elara/create_token_account", () => {
     });
   });
 
-  /*
   it("create ata account with WSOL", async () => {
     const unique_id = new BN(Date.now());
 
@@ -581,5 +574,4 @@ describe("elara/create_token_account", () => {
       takingAmount: new BN(takingAmount).sub(new BN(inAmount)),
     });
   });
-  */
 });

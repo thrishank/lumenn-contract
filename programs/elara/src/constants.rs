@@ -7,7 +7,7 @@ pub const PROTOCOL_VAULT_SEED: &[u8] = b"protocol_vault";
 pub const PROTOCOL_VAULT_BUMP: u8 = 254;
 
 #[constant]
-pub const ATA_CREATION_AMOUNT: u64 = 2039280;
+pub const TOKEN_ACCOUNT_SIZE: u8 = 165;
 
 #[constant]
 pub const SOL_MINT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
