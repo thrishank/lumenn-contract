@@ -12,10 +12,9 @@ import express from "express";
 import { bn, createRpc } from "@lightprotocol/stateless.js";
 import { parseEscrowFromBuffer } from "../tests/utils/fn";
 import { determineFillType, get_price, get_swap_instruction } from "./jup";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { create_ata, create_ata_wsol } from "./create_ata";
-import { fill, fill_wsol } from "./fill";
-import { expire, expire_wsol } from "./expire";
+import { create_token_ata } from "./instructions/create_ata";
+import { fill, fill_wsol } from "./instructions/fill";
+import { expire, expire_wsol } from "./instructions/expire";
 import * as dotenv from "dotenv";
 import {
   caluclate_target_ratio,
@@ -162,47 +161,19 @@ app.get(
         throw new Error("Order has expired");
       }
 
-      const ata = await getAssociatedTokenAddress(
-        escrow_data.tokens.outputMint,
-        escrow_data.maker
+      // This functions creates the ata if it doesn't exisit
+      let ata_created = await create_token_ata(
+        compressed_account,
+        escrow_data,
+        requestId
       );
 
-      const ata_exist = await rpc.getAccountInfo(ata);
-
-      let ata_created = false;
-
-      if (!ata_exist && !outputMint.equals(SOL_MINT)) {
-        logger.info("Creating ATA for maker", {
-          requestId,
-          ata: ata.toString(),
-        });
-
-        if (inputMint.equals(SOL_MINT)) {
-          await create_ata_wsol(compressed_account, escrow_data);
-        } else {
-          await create_ata(compressed_account, escrow_data);
-        }
-
-        // Verify ATA was created
-        const ataVerification = await rpc.getAccountInfo(ata, "processed");
-        if (!ataVerification) {
-          throw new Error("Failed to create ATA for maker");
-        }
-
-        ata_created = true;
-        logger.info("ATA created successfully", { requestId });
-      }
-
-      // TODO: move this to a seperate function because if the ata is created then we need to fetch with
-      // new data just give me the fill_type and divisor of the making amount if parital then in the final
-      // while sending the transaction i refetch the quote this is only needed if the ata is created above
-      // because the order status is changed
       const { current_ratio } = await get_price(
         inputMint.toString(),
         outputMint.toString()
       );
 
-      const target_ratio = caluclate_target_ratio(
+      const target_ratio = await caluclate_target_ratio(
         escrow_data.amount.makingAmount.toNumber(),
         escrow_data.amount.takingAmount.toNumber(),
         inputMint.toString(),
@@ -226,6 +197,7 @@ app.get(
       let finalAlt: any[] = [];
 
       if (ata_created) {
+        // NOTE:: this fetch call is to get the updated making amount. a few will be deducted in create ata
         const compressed_account = await rpc.getCompressedAccount(
           bn(address.toBytes())
         );
@@ -254,7 +226,6 @@ app.get(
 
       let tx: VersionedTransaction;
 
-      // TODO: if the transactin size is too large, set the only_direct_routes paramter in jup swap and try again
       if (outputMint.equals(SOL_MINT)) {
         tx = await fill_wsol(
           address,
@@ -353,22 +324,7 @@ app.get(
         );
       }
 
-      const ata = await getAssociatedTokenAddress(
-        escrow_data.tokens.outputMint,
-        escrow_data.maker
-      );
-
-      const ata_exist = await rpc.getAccountInfo(ata);
-
-      if (!ata_exist && !escrow_data.tokens.outputMint.equals(SOL_MINT)) {
-        logger.info("Creating ATA for expired order", { requestId });
-
-        if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
-          await create_ata_wsol(compressed_account, escrow_data);
-        } else {
-          await create_ata(compressed_account, escrow_data);
-        }
-      }
+      await create_token_ata(compressed_account, escrow_data, requestId);
 
       let tx: VersionedTransaction;
 
@@ -424,9 +380,9 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 
-const server = app.listen(3000, "127.0.0.1", () => {
+const server = app.listen(4000, "127.0.0.1", () => {
   logger.info("Elara Trading Server started", {
-    port: 3000,
+    port: 4000,
     environment: process.env.NODE_ENV || "development",
     nodeVersion: process.version,
   });

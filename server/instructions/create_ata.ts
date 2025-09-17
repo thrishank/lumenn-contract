@@ -6,17 +6,18 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { payer, program, rpc } from "./app";
+import { payer, program, rpc, SOL_MINT } from "../app";
 import {
   ADDRESS_QUEUE,
   ADDRESS_TREE,
   CLOSE_ACCOUNTS,
-} from "../tests/utils/address";
-import { Escrow } from "../tests/utils/fn";
-import { get_swap_instruction } from "./jup";
+} from "../../tests/utils/address";
+import { Escrow } from "../../tests/utils/fn";
+import { get_swap_instruction } from "../jup";
 import BN from "bn.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { get_rent_quote } from "./token-2022";
+import { get_rent_quote } from "../token-2022";
+import { logger } from "../utils";
 
 const sol_mint = new PublicKey("So11111111111111111111111111111111111111112");
 
@@ -156,8 +157,7 @@ export async function create_ata(
     .remainingAccounts([...CLOSE_ACCOUNTS, ...accounts])
     .instruction();
 
-  // TODO: When mainnet create the alt
-  const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5", ...alt];
+  const altAddresses = ["9NYFyEqPkyXUhkerbGHXUXkvb4qpzeEdHuGpgbgpH1NJ", ...alt];
 
   const altLookups = await Promise.all(
     altAddresses.map(async (address: any) => {
@@ -266,7 +266,7 @@ export async function create_ata_wsol(
     .remainingAccounts(CLOSE_ACCOUNTS)
     .instruction();
 
-  const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5"];
+  const altAddresses = ["9NYFyEqPkyXUhkerbGHXUXkvb4qpzeEdHuGpgbgpH1NJ"];
 
   const altLookups = await Promise.all(
     altAddresses.map(async (address: any) => {
@@ -294,4 +294,43 @@ export async function create_ata_wsol(
 
   const signature = await rpc.sendTransaction(tx);
   return signature;
+}
+
+export async function create_token_ata(
+  compressed_account: CompressedAccountWithMerkleContext,
+  escrow_data: Escrow,
+  requestId: any
+) {
+  const ata = await getAssociatedTokenAddress(
+    escrow_data.tokens.outputMint,
+    escrow_data.maker
+  );
+
+  const ata_exist = await rpc.getAccountInfo(ata);
+
+  if (ata_exist) {
+    return false;
+  }
+
+  if (!ata_exist && !escrow_data.tokens.outputMint.equals(SOL_MINT)) {
+    logger.info("Creating ATA for maker", {
+      requestId,
+      ata: ata.toString(),
+    });
+
+    if (escrow_data.tokens.inputMint.equals(SOL_MINT)) {
+      await create_ata_wsol(compressed_account, escrow_data);
+    } else {
+      await create_ata(compressed_account, escrow_data);
+    }
+
+    // Verify ATA was created
+    const ataVerification = await rpc.getAccountInfo(ata, "processed");
+    if (!ataVerification) {
+      throw new Error("Failed to create ATA for maker");
+    }
+
+    logger.info("ATA created successfully", { requestId });
+  }
+  return true;
 }

@@ -1,4 +1,4 @@
-use std::{ops::Div, str::FromStr};
+use std::str::FromStr;
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -118,6 +118,11 @@ pub fn fill<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
+    require!(
+        !jup_data.is_exact_out,
+        CustomError::InvalidJupInstructionData
+    );
+
     // let jupiter_accounts = &remaining[10..];
 
     // validate_jupiter_accounts(
@@ -136,13 +141,10 @@ pub fn fill<'info>(
     //     &ctx.accounts.jupiter_program,
     // )?;
 
+    transfer_tokens(&ctx, out_amount)?;
+
     match args.fill_type {
         FillType::Full => {
-            require!(
-                !jup_data.is_exact_out,
-                CustomError::InvalidJupInstructionData
-            );
-
             if in_amount != escrow_account.amount.making_amount {
                 return Err(error!(CustomError::InvalidInAmount));
             }
@@ -152,8 +154,6 @@ pub fn fill<'info>(
             }
 
             let escrow_address = light_cpi_close(&ctx, args, light_accounts)?;
-
-            transfer_tokens(&ctx, out_amount)?;
 
             emit!(FillEvent {
                 escrow_address,
@@ -168,11 +168,6 @@ pub fn fill<'info>(
             });
         }
         FillType::Partial => {
-            require!(
-                !jup_data.is_exact_out,
-                CustomError::InvalidJupInstructionData
-            );
-
             if in_amount > escrow_account.amount.making_amount {
                 return Err(ProgramError::InsufficientFunds.into());
             }
@@ -192,8 +187,6 @@ pub fn fill<'info>(
             let escrow_address =
                 light_cpi_update(&ctx, light_accounts, &args, in_amount, out_amount)?;
 
-            transfer_tokens(&ctx, out_amount)?;
-
             emit!(FillEvent {
                 escrow_address,
                 maker: ctx.accounts.maker.key(),
@@ -207,6 +200,7 @@ pub fn fill<'info>(
             });
         }
     }
+
     Ok(())
 }
 

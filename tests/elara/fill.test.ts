@@ -334,7 +334,6 @@ describe("elara/fill_order", () => {
     const makingAmount = new BN(10_000_000);
     const takingAmount = new BN(1_000_000_0);
 
-    // TODO: if the outputMint is SOL the program create the ATA but we need to close the account immediately after the tx
     const tx = await program.methods
       .initializeOrder(
         {

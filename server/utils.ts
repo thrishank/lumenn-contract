@@ -191,14 +191,52 @@ export const tokenMap: Map<string, Token> = new Map(
   tokens.map((t) => [t.id, t])
 );
 
-// TODO: how to handle if the token is not found ?
-export function caluclate_target_ratio(
+export async function caluclate_target_ratio(
   making_amount: number,
   taking_amount: number,
   making_token: string,
   taking_token: string
 ) {
-  const taking = taking_amount / 10 ** tokenMap.get(taking_token).decimals;
-  const making = making_amount / 10 ** tokenMap.get(making_token).decimals;
+  let takingToken = tokenMap.get(taking_token);
+  let makingToken = tokenMap.get(making_token);
+
+  if (!takingToken) {
+    takingToken = await fetch_token_data(taking_token);
+  }
+  if (!makingToken) {
+    makingToken = await fetch_token_data(making_token);
+  }
+
+  const taking = taking_amount / 10 ** takingToken.decimals;
+  const making = making_amount / 10 ** makingToken.decimals;
+
   return taking / making;
+}
+
+async function fetch_token_data(mint: string) {
+  const cached = tokenMap.get(mint);
+  if (cached) return cached;
+
+  // Fetch from Jupiter API
+  const url = `https://lite-api.jup.ag/tokens/v2/search?query=${mint}`;
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error(`Token not found on Jupiter: ${mint}`);
+  }
+
+  const token: Token = {
+    id: data[0].id,
+    name: data[0].name,
+    symbol: data[0].symbol,
+    icon: data[0].icon,
+    decimals: data[0].decimals,
+    tokenProgram: data[0].tokenProgram,
+  };
+
+  tokens.push(token);
+  tokenMap.set(token.id, token);
+
+  return token;
 }

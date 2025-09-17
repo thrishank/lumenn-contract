@@ -145,6 +145,56 @@ pub fn fill<'info>(
     let rent = Rent::get()?;
     let ata_creation_amount = rent.minimum_balance(TOKEN_ACCOUNT_SIZE as usize);
 
+    let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
+
+    transfer_checked(
+        CpiContext::new_with_signer(
+            ctx.accounts.output_token_program.to_account_info(),
+            TransferChecked {
+                from: ctx
+                    .accounts
+                    .protocol_vault_output_mint_ata
+                    .to_account_info(),
+                to: ctx.accounts.temp_wsol_ata.to_account_info(),
+                authority: ctx.accounts.protocol_vault.to_account_info(),
+                mint: ctx.accounts.sol_mint.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        out_amount - ata_creation_amount,
+        ctx.accounts.sol_mint.decimals,
+    )?;
+
+    transfer_checked(
+        CpiContext::new_with_signer(
+            ctx.accounts.output_token_program.to_account_info(),
+            TransferChecked {
+                from: ctx
+                    .accounts
+                    .protocol_vault_output_mint_ata
+                    .to_account_info(),
+                to: ctx.accounts.payer_wsol_ata.to_account_info(),
+                mint: ctx.accounts.sol_mint.to_account_info(),
+                authority: ctx.accounts.protocol_vault.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        ata_creation_amount,
+        ctx.accounts.sol_mint.decimals,
+    )?;
+
+    let temp_signer_seeds: [&[&[u8]]; 1] = [&[b"temp_account", &[ctx.bumps.temp_account]]];
+
+    close_account(CpiContext::new_with_signer(
+        ctx.accounts.output_token_program.to_account_info(),
+        CloseAccount {
+            account: ctx.accounts.temp_wsol_ata.to_account_info(),
+            destination: ctx.accounts.maker.to_account_info(),
+            authority: ctx.accounts.temp_account.to_account_info(),
+        },
+        &temp_signer_seeds,
+    ))?;
+
     match args.fill_type {
         FillType::Full => {
             if in_amount != escrow_account.amount.making_amount {
@@ -202,56 +252,6 @@ pub fn fill<'info>(
             });
         }
     }
-
-    let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
-
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.output_token_program.to_account_info(),
-            TransferChecked {
-                from: ctx
-                    .accounts
-                    .protocol_vault_output_mint_ata
-                    .to_account_info(),
-                to: ctx.accounts.temp_wsol_ata.to_account_info(),
-                authority: ctx.accounts.protocol_vault.to_account_info(),
-                mint: ctx.accounts.sol_mint.to_account_info(),
-            },
-            signer_seeds,
-        ),
-        out_amount - ata_creation_amount,
-        ctx.accounts.sol_mint.decimals,
-    )?;
-
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.output_token_program.to_account_info(),
-            TransferChecked {
-                from: ctx
-                    .accounts
-                    .protocol_vault_output_mint_ata
-                    .to_account_info(),
-                to: ctx.accounts.payer_wsol_ata.to_account_info(),
-                mint: ctx.accounts.sol_mint.to_account_info(),
-                authority: ctx.accounts.protocol_vault.to_account_info(),
-            },
-            signer_seeds,
-        ),
-        ata_creation_amount,
-        ctx.accounts.sol_mint.decimals,
-    )?;
-
-    let temp_signer_seeds: [&[&[u8]]; 1] = [&[b"temp_account", &[ctx.bumps.temp_account]]];
-
-    close_account(CpiContext::new_with_signer(
-        ctx.accounts.output_token_program.to_account_info(),
-        CloseAccount {
-            account: ctx.accounts.temp_wsol_ata.to_account_info(),
-            destination: ctx.accounts.maker.to_account_info(),
-            authority: ctx.accounts.temp_account.to_account_info(),
-        },
-        &temp_signer_seeds,
-    ))?;
 
     Ok(())
 }

@@ -1,7 +1,7 @@
-import { parseEscrowFromBuffer } from "../tests/utils/fn";
 import { bn } from "@lightprotocol/stateless.js";
-import { payer, program, rpc } from "./app";
+import { payer, program, rpc } from "../app";
 import {
+  AddressLookupTableAccount,
   ComputeBudgetProgram,
   PublicKey,
   TransactionMessage,
@@ -11,18 +11,25 @@ import {
   ADDRESS_QUEUE,
   ADDRESS_TREE,
   CLOSE_ACCOUNTS,
-} from "../tests/utils/address";
-import { retryOperation } from "./utils";
+} from "../../tests/utils/address";
+import { parseEscrowFromBuffer } from "../../tests/utils/fn";
+import { retryOperation } from "../utils";
 
-export async function expire(address: PublicKey) {
-  let compressed_account = await retryOperation(
+export async function fill(
+  address: PublicKey,
+  fill_type: "full" | "partial",
+  instruction_data: any,
+  accounts: any[],
+  alt: any[]
+) {
+  const compressed_account = await retryOperation(
     () => rpc.getCompressedAccount(bn(address.toBytes())),
     3,
     1000,
     "getCompressedAccount"
   );
 
-  const proof = await rpc.getValidityProofV0(
+  let proof = await rpc.getValidityProofV0(
     [
       {
         hash: compressed_account.hash,
@@ -38,7 +45,8 @@ export async function expire(address: PublicKey) {
   const escrow_data = parseEscrowFromBuffer(compressed_account.data.data);
 
   const instruction = await program.methods
-    .cancelOrder({
+    .fillOrder({
+      swapData: Buffer.from(instruction_data, "base64"),
       escrowAccount: {
         uniqueId: escrow_data.uniqueId,
         amount: {
@@ -67,6 +75,7 @@ export async function expire(address: PublicKey) {
         leafIndex: compressed_account.leafIndex,
       },
       outputStateTreeIndex: 0,
+      fillType: fill_type === "full" ? { full: {} } : { partial: {} },
     })
     .accounts({
       payer: payer.publicKey,
@@ -75,30 +84,56 @@ export async function expire(address: PublicKey) {
       outputMint: escrow_data.tokens.outputMint,
       inputTokenProgram: escrow_data.tokens.inputTokenProgram,
       outputTokenProgram: escrow_data.tokens.outputTokenProgram,
+      jupiterProgram: new PublicKey(
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+      ),
     })
-    .remainingAccounts(CLOSE_ACCOUNTS)
+    .remainingAccounts([...CLOSE_ACCOUNTS, ...accounts])
     .instruction();
+
+  const altAddresses = ["9NYFyEqPkyXUhkerbGHXUXkvb4qpzeEdHuGpgbgpH1NJ", ...alt];
+
+  const altLookups = await Promise.all(
+    altAddresses.map(async (address: any) => {
+      const alt = await rpc.getAddressLookupTable(new PublicKey(address));
+      if (!alt.value) throw new Error(`ALT not found: ${address}`);
+      return new AddressLookupTableAccount({
+        key: new PublicKey(address),
+        state: alt.value.state,
+      });
+    })
+  );
 
   const latestBlockhash = await rpc.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: payer.publicKey,
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
       instruction,
     ],
-  }).compileToV0Message();
+  }).compileToV0Message(altLookups);
 
   const tx = new VersionedTransaction(message);
+
   return tx;
 }
 
-export async function expire_wsol(address: PublicKey) {
-  const compressed_account = await rpc.getCompressedAccount(
-    bn(address.toBytes())
+export async function fill_wsol(
+  address: PublicKey,
+  fill_type: "full" | "partial",
+  instruction_data: any,
+  accounts: any[],
+  alt: any[]
+) {
+  const compressed_account = await retryOperation(
+    () => rpc.getCompressedAccount(bn(address.toBytes())),
+    3,
+    1000,
+    "getCompressedAccount"
   );
 
-  const proof = await rpc.getValidityProofV0(
+  let proof = await rpc.getValidityProofV0(
     [
       {
         hash: compressed_account.hash,
@@ -114,7 +149,8 @@ export async function expire_wsol(address: PublicKey) {
   const escrow_data = parseEscrowFromBuffer(compressed_account.data.data);
 
   const instruction = await program.methods
-    .expireWsolOrder({
+    .fillWsolOrder({
+      swapData: Buffer.from(instruction_data, "base64"),
       escrowAccount: {
         uniqueId: escrow_data.uniqueId,
         amount: {
@@ -143,27 +179,45 @@ export async function expire_wsol(address: PublicKey) {
         leafIndex: compressed_account.leafIndex,
       },
       outputStateTreeIndex: 0,
+      fillType: fill_type === "full" ? { full: {} } : { partial: {} },
     })
     .accounts({
       payer: payer.publicKey,
       maker: escrow_data.maker,
-      outputMint: escrow_data.tokens.outputMint,
+      inputMint: escrow_data.tokens.inputMint,
       inputTokenProgram: escrow_data.tokens.inputTokenProgram,
       outputTokenProgram: escrow_data.tokens.outputTokenProgram,
+      jupiterProgram: new PublicKey(
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+      ),
     })
-    .remainingAccounts(CLOSE_ACCOUNTS)
+    .remainingAccounts([...CLOSE_ACCOUNTS, ...accounts])
     .instruction();
+
+  const altAddresses = ["9NYFyEqPkyXUhkerbGHXUXkvb4qpzeEdHuGpgbgpH1NJ", ...alt];
+
+  const altLookups = await Promise.all(
+    altAddresses.map(async (address: any) => {
+      const alt = await rpc.getAddressLookupTable(new PublicKey(address));
+      if (!alt.value) throw new Error(`ALT not found: ${address}`);
+      return new AddressLookupTableAccount({
+        key: new PublicKey(address),
+        state: alt.value.state,
+      });
+    })
+  );
 
   const latestBlockhash = await rpc.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: payer.publicKey,
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
       instruction,
     ],
-  }).compileToV0Message();
+  }).compileToV0Message(altLookups);
 
   const tx = new VersionedTransaction(message);
+
   return tx;
 }

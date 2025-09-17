@@ -1,6 +1,12 @@
 import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
 import { Escrow } from "../tests/utils/fn";
+import {
+  createAssociatedTokenAccount,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
+import { payer, rpc } from "./app";
+import { tokenMap } from "./utils";
 
 export async function get_quote(
   input_mint: string,
@@ -20,6 +26,8 @@ export async function get_quote(
   };
 }
 
+const fee = new PublicKey("feeSsye1xpD4zaxVh19n92abi3ZyWngAD47Z3ygPGPA");
+
 export async function get_swap_instruction(
   input_mint: string,
   output_mint: string,
@@ -27,15 +35,16 @@ export async function get_swap_instruction(
   swapMode: "ExactOut" | "ExactIn",
   platformFeeBps = 0 | 5
 ) {
+  const fee_acc = await create_fee_ata(new PublicKey(input_mint));
+
   const quote_url =
     `https://lite-api.jup.ag/swap/v1/quote?` +
     `inputMint=${input_mint}&outputMint=${output_mint}` +
     `&amount=${amount}&swapMode=${swapMode}&slippageBps=0` +
     `&platformFeeBps=${platformFeeBps}`;
 
-  // TODO:  checkout max_accounts param
-
   const quote = await axios.get(quote_url);
+
   let config = {
     method: "post",
     maxBodyLength: Infinity,
@@ -47,7 +56,8 @@ export async function get_swap_instruction(
     data: JSON.stringify({
       userPublicKey: "HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd",
       quoteResponse: quote.data,
-      // TODO: add &feeRecipient and make sure the token account(for input_mint) exists if not create
+      feeAccount: fee_acc.toString(),
+      // NOTE: token account is the ata of fee and input mint
     }),
   };
   const swap = await axios.request(config);
@@ -85,7 +95,6 @@ export async function get_price(input_mint: string, output_mint: string) {
   return { current_ratio, inputPrice, outputPrice };
 }
 
-// TODO: improve this do binary search
 export async function determineFillType(
   escrow_data: Escrow,
   inputMint: PublicKey,
@@ -124,4 +133,27 @@ export async function determineFillType(
   }
 
   throw new Error("Swap Quote not found to fill the order");
+}
+
+async function create_fee_ata(mint: PublicKey) {
+  const ata = await getAssociatedTokenAddress(mint, fee);
+
+  const ata_exist = await rpc.getAccountInfo(ata);
+
+  if (ata_exist) return ata;
+
+  const token = tokenMap.get(mint.toString());
+
+  if (!token) {
+    throw new Error(`Token metadata not found for mint ${mint.toBase58()}`);
+  }
+
+  return await createAssociatedTokenAccount(
+    rpc,
+    payer,
+    mint,
+    fee,
+    null,
+    new PublicKey(token.tokenProgram)
+  );
 }
