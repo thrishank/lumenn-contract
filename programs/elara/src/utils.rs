@@ -9,7 +9,6 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token::spl_token,
 };
 
-#[inline]
 pub fn validate_jupiter_accounts(
     route: &JupiterRoutes,
     jupiter_accounts: &[AccountInfo],
@@ -118,11 +117,19 @@ fn validate_exact_out_route(
         CustomError::InvalidFeeAccount
     );
 
-    require_keys_eq!(
-        jup_accounts[8].key(),
-        spl_token_2022::ID,
-        CustomError::InvalidTokenProgramId
-    );
+    if input_token_program == spl_token_2022::ID {
+        require_keys_eq!(
+            jup_accounts[8].key(),
+            spl_token_2022::ID,
+            CustomError::InvalidTokenProgramId
+        );
+    } else {
+        require_keys_eq!(
+            jup_accounts[8].key(),
+            JUPITER_V6_PROGRAM_ID,
+            CustomError::InvalidTokenProgramId
+        );
+    }
 
     require_keys_eq!(
         jup_accounts[9].key(),
@@ -234,6 +241,9 @@ fn validate_shared_accounts_route(
         CustomError::InvalidTokenProgramId
     );
 
+    // 1 Jupiter Aggregator Authority
+    let program_authority = jup_accounts[1].key();
+
     require_keys_eq!(
         jup_accounts[2].key(),
         PROTOCOL_VAULT,
@@ -253,8 +263,6 @@ fn validate_shared_accounts_route(
     );
 
     require!(jup_accounts[3].is_writable, CustomError::NotWritable);
-
-    let program_authority = jup_accounts[1].key();
 
     let program_source_token_account = get_associated_token_address_with_program_id(
         &program_authority,
@@ -322,11 +330,19 @@ fn validate_shared_accounts_route(
         CustomError::InvalidFeeAccount
     );
 
-    require_keys_eq!(
-        jup_accounts[10].key(),
-        spl_token_2022::ID,
-        CustomError::InvalidTokenProgramId
-    );
+    if input_token_program == spl_token_2022::ID {
+        require_keys_eq!(
+            jup_accounts[10].key(),
+            spl_token_2022::ID,
+            CustomError::InvalidTokenProgramId
+        );
+    } else {
+        require_keys_eq!(
+            jup_accounts[10].key(),
+            JUPITER_V6_PROGRAM_ID,
+            CustomError::InvalidTokenProgramId
+        );
+    }
 
     require_keys_eq!(
         jup_accounts[11].key(),
@@ -355,6 +371,7 @@ pub const NOOP_PROGRAM: Pubkey = pubkey!("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjN
 pub const SYSTEM_PROGRAM_ID: Pubkey = pubkey!("11111111111111111111111111111111");
 pub const LIGHT_SYSTEM_PROGRAM: Pubkey = pubkey!("SySTEM1eSU2p4BGQfQpimFEWWSC1XDFeun3Nqzz3rT7");
 // TODO: Change this as program id changes
+// PublicKey.findProgramAddressSync([Buffer.from("cpi_authority")], PROGRAM_ID)
 pub const CPI_AUTHORITY: Pubkey = pubkey!("6t6j75BtqzzTfgR6ebW8wR7m82gRzJQiLK4TqN7gKTKs");
 
 pub enum LightAccountSet {
