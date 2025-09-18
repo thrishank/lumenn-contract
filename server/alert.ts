@@ -1,7 +1,9 @@
 import { Telegraf } from "telegraf";
 import axios from "axios";
 
-const bot = new Telegraf("7887692704:AAE9g8oEGMB-REyHu7ZITvzrVLOG10f11Mc");
+export const bot = new Telegraf(
+  "7887692704:AAE9g8oEGMB-REyHu7ZITvzrVLOG10f11Mc"
+);
 
 bot.use((ctx, next) => {
   console.log(ctx.message);

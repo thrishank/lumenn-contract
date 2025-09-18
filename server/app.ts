@@ -24,6 +24,7 @@ import {
   requestLogger,
   retryOperation,
 } from "./utils";
+import { bot } from "./alert";
 
 dotenv.config();
 
@@ -101,6 +102,15 @@ app.get("/metrics", (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
+});
+
+// TODO: set up the webhook when the server is live
+app.post("/idl", (req, res) => {
+  // C88XWfp26heEmDkmfSzeXP7Fd7GQJ2j9dDTUsyiZbUTa;
+  bot.telegram.sendMessage(
+    1520778961,
+    "idl changed. Update to the new one ASAP"
+  );
 });
 
 app.get(
