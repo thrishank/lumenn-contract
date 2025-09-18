@@ -133,7 +133,7 @@ pub fn create_token_account<'info>(
         // TODO: if over transfer the diff to maker. Transaction size limit ?
     }
 
-    if jup_data.slippage_bps != 0 {
+    if jup_data.slippage_bps > 26 {
         return Err(error!(CustomError::SlippageTooHigh));
     }
 

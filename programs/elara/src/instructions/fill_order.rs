@@ -109,7 +109,7 @@ pub fn fill<'info>(
 
     let escrow_account = args.escrow_account;
 
-    if jup_data.slippage_bps != 0 {
+    if jup_data.slippage_bps > 26 {
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
