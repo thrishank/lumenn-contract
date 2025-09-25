@@ -370,9 +370,7 @@ pub const ACCOUNT_COMPRESSION_AUTHORITY: Pubkey =
 pub const NOOP_PROGRAM: Pubkey = pubkey!("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
 pub const SYSTEM_PROGRAM_ID: Pubkey = pubkey!("11111111111111111111111111111111");
 pub const LIGHT_SYSTEM_PROGRAM: Pubkey = pubkey!("SySTEM1eSU2p4BGQfQpimFEWWSC1XDFeun3Nqzz3rT7");
-// TODO: Change this as program id changes
-// PublicKey.findProgramAddressSync([Buffer.from("cpi_authority")], PROGRAM_ID)
-pub const CPI_AUTHORITY: Pubkey = pubkey!("6t6j75BtqzzTfgR6ebW8wR7m82gRzJQiLK4TqN7gKTKs");
+pub const CPI_AUTHORITY: Pubkey = pubkey!("3odTzpE7FpCgYvFkQDWuNSyEhCeLkgpvMCB8Q3Nrj9T1");
 
 pub enum LightAccountSet {
     Init,

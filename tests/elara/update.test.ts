@@ -3,6 +3,7 @@ import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { Program } from "@coral-xyz/anchor";
 import { Elara } from "../../target/types/elara";
 import {
+  AddressLookupTableAccount,
   ComputeBudgetProgram,
   PublicKey,
   Signer,
@@ -209,6 +210,19 @@ describe("elara/update_order", () => {
       .remainingAccounts(CLOSE_ACCOUNTS)
       .instruction();
 
+    const alt = ["qAJZMgnQJ8G6vA3WRcjD9Jan1wtKkaCFWLWskxJrR5V"];
+
+    const altLookups = await Promise.all(
+      alt.map(async (address: any) => {
+        const alt = await rpc.getAddressLookupTable(new PublicKey(address));
+        if (!alt.value) throw new Error(`ALT not found: ${address}`);
+        return new AddressLookupTableAccount({
+          key: new PublicKey(address),
+          state: alt.value.state,
+        });
+      })
+    );
+
     const latestBlockhash = await rpc.getLatestBlockhash();
     const message = new TransactionMessage({
       payerKey: payer.publicKey,
@@ -217,7 +231,7 @@ describe("elara/update_order", () => {
         ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
         instruction,
       ],
-    }).compileToV0Message();
+    }).compileToV0Message(altLookups);
 
     const tx1 = new VersionedTransaction(message);
     tx1.sign([payer]);

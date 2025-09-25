@@ -6,22 +6,22 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-elara = "4LhEEtzAhM6wEXJR2YQHPEs79UEx8e6HncmeHbqbW1w1"
+elara = "LUMENWrdxm6FaNpmVY86KTP6ihYv8B74eoHGYkksNaP"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Devnet"
+cluster = "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test-init = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/init.test.ts"
-test-cancel = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/cancel.test.ts"
-test-expire = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/expire.test.ts"
-test-update = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/update.test.ts"
-test-ata = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/ata.test.ts"
-test-fill = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/fill.test.ts"
-test-partial = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/partial-fill.test.ts"
-test-close = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/close.test.ts"
 test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test-ata = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/ata.test.ts"
+test-cancel = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/cancel.test.ts"
+test-close = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/close.test.ts"
+test-expire = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/expire.test.ts"
+test-fill = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/fill.test.ts"
+test-init = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/init.test.ts"
+test-partial = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/partial-fill.test.ts"
+test-update = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/update.test.ts"

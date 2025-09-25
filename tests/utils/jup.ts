@@ -25,11 +25,21 @@ export async function get_swap(
     data: JSON.stringify({
       userPublicKey: address,
       quoteResponse: quote.data,
+      feeAccount: address,
     }),
   };
   const swap = await axios.request(config);
+
+  const accounts = swap.data.swapInstruction.accounts.map((acc: any) => ({
+    pubkey: new PublicKey(acc.pubkey),
+    isWritable: acc.isWritable,
+    isSigner: false,
+  }));
+
   return {
     swap: swap.data,
+    accounts,
+    alt: swap.data.addressLookupTableAddresses,
     inAmount: quote.data.inAmount,
     outAmount: quote.data.outAmount,
   };
@@ -43,7 +53,7 @@ export async function get_swap_instruction() {
     new PublicKey("9RzWC4ZS6LdNUP2LwaY7Ztq5sTxgt3dFLp2jjokhm9Vz"),
     fee_pubkey
   );
-  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=So11111111111111111111111111111111111111112&amount=20392800000000&feeAccount=${ata.toString()}`;
+  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN&outputMint=Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB&amount=100000000&slippageBps=10&platformFeeBps=10&maxAccounts=40&onlyDirectRoutes=true`;
 
   const quote = await axios.get(quote_url);
   let config = {
@@ -57,6 +67,7 @@ export async function get_swap_instruction() {
     data: JSON.stringify({
       userPublicKey: "HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd",
       quoteResponse: quote.data,
+      feeAccount: ata.toString(),
     }),
   };
   const swap = await axios.request(config);
@@ -65,5 +76,9 @@ export async function get_swap_instruction() {
     isWritable: acc.isWritable,
     isSigner: false,
   }));
-  return { accounts, alt: swap.data.addressLookupTableAddresses };
+  return {
+    swap: swap.data,
+    accounts,
+    alt: swap.data.addressLookupTableAddresses,
+  };
 }

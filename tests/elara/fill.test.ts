@@ -77,14 +77,13 @@ describe("elara/fill_order", () => {
 
   const assetSeed = deriveAddressSeed(seeds, program.programId);
   const address = deriveAddress(assetSeed, ADDRESS_TREE);
-  /*
 
   it("fill order", async () => {
     console.log("Initializing order...");
 
     const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5"];
 
-    const { accounts: jup_accounts, alt } = await get_swap_instruction();
+    const { swap, accounts: jup_accounts, alt } = await get_swap_instruction();
 
     for (const key of alt) {
       const newAlt = await clone_alt(key);
@@ -103,7 +102,6 @@ describe("elara/fill_order", () => {
 
     const makingAmount = new BN(1_000_000);
     const takingAmount = new BN(500_000);
-    const slippageBps = 50; // 0.5%
 
     const tx = await program.methods
       .initializeOrder(
@@ -162,7 +160,7 @@ describe("elara/fill_order", () => {
     const buffer = compressed_account?.data?.data!;
     let escrow_data = parseEscrowFromBuffer(buffer);
 
-    const { swap, inAmount, outAmount } = await get_swap(
+    const { inAmount, outAmount } = await get_swap(
       "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j",
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
@@ -305,8 +303,8 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
-  */
 
+  /*
   it("fill order WSOL", async () => {
     const unique_id2 = new BN(Date.now());
 
@@ -527,4 +525,5 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
+  */
 });

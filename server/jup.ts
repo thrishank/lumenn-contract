@@ -33,17 +33,28 @@ export async function get_swap_instruction(
   output_mint: string,
   amount: number,
   swapMode: "ExactOut" | "ExactIn",
-  platformFeeBps = 0 | 5
+  platformFeeBps = 0,
+  onlyDirectRoutes: boolean = false
 ) {
   const fee_acc = await create_fee_ata(new PublicKey(input_mint));
 
-  const quote_url =
+  let quote_url =
     `https://lite-api.jup.ag/swap/v1/quote?` +
     `inputMint=${input_mint}&outputMint=${output_mint}` +
-    `&amount=${amount}&swapMode=${swapMode}&slippageBps=0` +
-    `&platformFeeBps=${platformFeeBps}`;
+    `&amount=${amount}&swapMode=${swapMode}&slippageBps=0&onlyDirectRoutes=${onlyDirectRoutes}`;
+
+  if (platformFeeBps !== 0) {
+    quote_url += `&platformFeeBps=${platformFeeBps}`;
+  }
 
   const quote = await axios.get(quote_url);
+
+  let body = {
+    userPublicKey: "FFbzGFqJYhxRPTsuAJ8jjjXUTiMhAqZoGRj9x8ZCN6T7",
+    quoteResponse: quote.data,
+    ...(platformFeeBps !== 0 ? { feeAccount: fee_acc.toString() } : {}),
+    // NOTE: token account is the ata of fee and input mint
+  };
 
   let config = {
     method: "post",
@@ -53,12 +64,7 @@ export async function get_swap_instruction(
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    data: JSON.stringify({
-      userPublicKey: "HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd",
-      quoteResponse: quote.data,
-      feeAccount: fee_acc.toString(),
-      // NOTE: token account is the ata of fee and input mint
-    }),
+    data: JSON.stringify(body),
   };
   const swap = await axios.request(config);
 
@@ -116,7 +122,8 @@ export async function determineFillType(
         inputMint.toString(),
         outputMint.toString(),
         tryInAmount,
-        "ExactIn"
+        "ExactIn",
+        10
       );
 
     if (outAmount >= escrow_data.amount.takingAmount.toNumber()) {

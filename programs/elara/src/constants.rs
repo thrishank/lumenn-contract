@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 pub const PROTOCOL_VAULT_SEED: &[u8] = b"protocol_vault";
 
 #[constant]
-pub const PROTOCOL_VAULT_BUMP: u8 = 254;
+pub const PROTOCOL_VAULT_BUMP: u8 = 255;
 
 #[constant]
 pub const TOKEN_ACCOUNT_SIZE: u8 = 165;
@@ -13,7 +13,7 @@ pub const TOKEN_ACCOUNT_SIZE: u8 = 165;
 pub const SOL_MINT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
 
 #[constant]
-pub const PROTOCOL_VAULT: Pubkey = pubkey!("HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd");
+pub const PROTOCOL_VAULT: Pubkey = pubkey!("FFbzGFqJYhxRPTsuAJ8jjjXUTiMhAqZoGRj9x8ZCN6T7");
 
 #[constant]
 pub const FEE_ACCOUNT: Pubkey = pubkey!("feeSsye1xpD4zaxVh19n92abi3ZyWngAD47Z3ygPGPA");

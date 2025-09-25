@@ -68,7 +68,7 @@ pub enum CustomError {
     #[msg("Invalid escrow address")]
     InvalidEscrow,
 
-    #[msg("Invalid platform fee BPS: must be either 0 or 5")]
+    #[msg("Invalid platform fee BPS: must be either 0 or 10")]
     InvalidPlatformFeeBps,
 
     #[msg("Invalid instruction: to create an ATA for SOL, call `create_ata_wsol` instead")]

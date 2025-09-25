@@ -13,9 +13,7 @@ export const ADDRESS_TREE = pubkey(
 export const ADDRESS_QUEUE = pubkey(
   "aq1S9z4reTSQAdgWHGD2zDaS39sjGrAxbR31vxJ2F4F"
 );
-export const PROGRAM_ID = pubkey(
-  "4LhEEtzAhM6wEXJR2YQHPEs79UEx8e6HncmeHbqbW1w1"
-);
+export const PROGRAM_ID = pubkey("LUMENWrdxm6FaNpmVY86KTP6ihYv8B74eoHGYkksNaP");
 export const COMPRESSION_PROGRAM = pubkey(
   "compr6CUsB5m2jS4Y3831ztGSTnDpnKJTKS95d64XVq"
 );

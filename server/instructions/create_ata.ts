@@ -58,14 +58,17 @@ export async function create_ata(
       escrow_data.tokens.inputMint.toString(),
       sol_mint.toString(),
       2039280,
-      "ExactOut"
+      "ExactOut",
+      0,
+      true
     );
 
     const { inAmount } = await get_swap_instruction(
       escrow_data.tokens.outputMint.toString(),
       sol_mint.toString(),
       2039280,
-      "ExactOut"
+      "ExactOut",
+      0
     );
     instruction_data = result.instruction_data;
     accounts = result.accounts;
@@ -218,7 +221,9 @@ export async function create_ata_wsol(
     escrow_data.tokens.outputMint.toString(),
     sol_mint.toString(),
     2039280,
-    "ExactOut"
+    "ExactOut",
+    0,
+    true
   );
 
   const instruction = await program.methods

@@ -219,7 +219,8 @@ app.get(
           escrow_data.amount.makingAmount
             .div(new BN(fill_data.divisor))
             .toNumber(),
-          "ExactIn"
+          "ExactIn",
+          10
         );
         finalInstructionData = instruction_data;
         finalAccounts = accounts;
@@ -232,6 +233,22 @@ app.get(
 
       if (!finalInstructionData) {
         throw new Error("Swap Quote not found to fill the order");
+      }
+
+      if (finalAlt.length > 2) {
+        const { instruction_data, accounts, alt } = await get_swap_instruction(
+          inputMint.toString(),
+          outputMint.toString(),
+          escrow_data.amount.makingAmount
+            .div(new BN(fill_data.divisor))
+            .toNumber(),
+          "ExactIn",
+          10,
+          true
+        );
+        finalInstructionData = instruction_data;
+        finalAccounts = accounts;
+        finalAlt = alt;
       }
 
       let tx: VersionedTransaction;

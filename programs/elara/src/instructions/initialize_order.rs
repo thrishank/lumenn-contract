@@ -172,6 +172,8 @@ pub fn init<'info>(
     cpi.invoke_light_system_program(light_cpi_accounts)
         .map_err(ProgramError::from)?;
 
+    let before_balance = ctx.accounts.protocol_vault_input_mint_ata.amount;
+
     let transfer_accounts = TransferChecked {
         from: ctx.accounts.maker_input_mint_ata.to_account_info(),
         to: ctx.accounts.protocol_vault_input_mint_ata.to_account_info(),
@@ -187,6 +189,18 @@ pub fn init<'info>(
         order_args.making_amount,
         ctx.accounts.input_mint.decimals,
     )?;
+
+    ctx.accounts.protocol_vault_input_mint_ata.reload()?;
+    let after_balance = ctx.accounts.protocol_vault_input_mint_ata.amount;
+
+    // Assert invariant: after balance must be >= before + making_amount
+    require!(
+        after_balance
+            >= before_balance
+                .checked_add(order_args.making_amount)
+                .ok_or(ProgramError::InvalidArgument)?,
+        CustomError::InvalidAmount
+    );
 
     emit!(OrderInitialized {
         escrow_address,

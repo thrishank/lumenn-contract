@@ -1,5 +1,5 @@
 {
-  "address": "4LhEEtzAhM6wEXJR2YQHPEs79UEx8e6HncmeHbqbW1w1",
+  "address": "LUMENWrdxm6FaNpmVY86KTP6ihYv8B74eoHGYkksNaP",
   "metadata": {
     "name": "elara",
     "version": "0.1.0",
@@ -634,9 +634,9 @@
       "name": "fill_order",
       "docs": [
         "fill the order when the price reaches the user target",
-        "this instruction will be called a worker that is monitoring the price",
-        "swap the token in vault using jupiter cpi",
-        "close the light compressed escrow account",
+        "this instruction will be called by a worker that is monitoring the price",
+        "swap's the token in vault using jupiter cpi",
+        "close or update the light compressed escrow account",
         "transfer the output tokens to the maker"
       ],
       "discriminator": [2],
@@ -1379,7 +1379,7 @@
     {
       "code": 6022,
       "name": "InvalidPlatformFeeBps",
-      "msg": "Invalid platform fee BPS: must be either 0 or 5"
+      "msg": "Invalid platform fee BPS: must be either 0 or 10"
     },
     {
       "code": 6023,
@@ -2131,4 +2131,3 @@
     }
   ]
 }
-

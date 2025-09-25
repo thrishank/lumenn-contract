@@ -41,6 +41,7 @@ async function checkEndpoints() {
       }
     }
   } catch (err: any) {
+    // TODO: need to add proper error messages here
     await sendAlert(`Something is down. Endpoint check failed: ${err.message}`);
   }
 }

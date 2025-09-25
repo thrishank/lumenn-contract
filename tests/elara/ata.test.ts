@@ -178,13 +178,16 @@ describe("elara/create_token_account", () => {
       true
     );
 
-    const { swap, inAmount } = await get_swap(
+    const {
+      swap,
+      inAmount,
+      accounts: jup_accounts,
+      alt,
+    } = await get_swap(
       "HmTYE1huZakHZn9VwSR6p6mBjGFT8hJUCRC4aWuCCSnd",
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       "So11111111111111111111111111111111111111112"
     );
-
-    const { accounts: jup_accounts, alt } = await get_swap_instruction();
 
     const instruction = await program.methods
       .createAta({

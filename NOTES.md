@@ -18,3 +18,15 @@
 - expire - 1055 no ALT
 
 ## Create ATA
+
+- size - 1094 with one ALT
+
+## Update
+
+- Transaction Size with ALT - 725 (no SOL)
+
+## Fill
+
+- Transaction Size 1158,1190 (600 address from 3 ALT) (no SOL)
+- 397 with 2 ALT, size - 1184
+- 996, 900 address from 4 ALT && 753 (3 ALT), error - RangeError: encoding overruns Uint8Array
