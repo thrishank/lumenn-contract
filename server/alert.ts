@@ -16,8 +16,8 @@ const CHECK_INTERVAL = 30_000; // 30s
 const AUTO_RESUME_DELAY = 60 * 60 * 1000; // 1 hour
 
 const ENDPOINTS = [
-  "http://localhost:4000/health",
   "http://localhost:4000",
+  "http://localhost:4000/health",
   "http://localhost:4001/api/v1/status",
 ];
 
@@ -36,13 +36,37 @@ async function checkEndpoints() {
         await sendAlert(`${url} returned status ${res.status}`);
       } else if (url.includes("/health") && res.data?.status !== "healthy") {
         await sendAlert(`${url} unhealthy: ${JSON.stringify(res.data)}`);
-      } else if (url.includes("/status") && !res.data?.is_running) {
-        await sendAlert(`${url} matching engine is not running`);
+      } else if (url.includes("/status")) {
+        const statusChecks = [
+          {
+            key: "is_running",
+            message: "The matching engine appears to be down.",
+          },
+          {
+            key: "logs_socket_running",
+            message: "The logs socket appears to be down.",
+          },
+          {
+            key: "pyth_running",
+            message: "The pyth service appears to be down.",
+          },
+          {
+            key: "jup_running",
+            message: "The jup service appears to be down.",
+          },
+        ];
+
+        for (const check of statusChecks) {
+          if (!res.data?.[check.key]) {
+            await sendAlert(`Endpoint ${url} is not running. ${check.message}`);
+            break;
+          }
+        }
       }
     }
   } catch (err: any) {
-    // TODO: need to add proper error messages here
     await sendAlert(`Something is down. Endpoint check failed: ${err.message}`);
+    console.log(err);
   }
 }
 
@@ -171,15 +195,52 @@ ${pairs.length > 0 ? pairs.join("\n") : "No pairs"}
   }
 });
 
+bot.command("code", async (ctx) => {
+  const loadingMessage = await ctx.reply("Creating code...");
+
+  try {
+    const args = ctx.message.text.split(" ").slice(1);
+    let maxUses = 1;
+
+    // Check if the first argument is a number.
+    if (args.length > 0 && !isNaN(parseInt(args[0]))) {
+      maxUses = parseInt(args[0]);
+    }
+
+    const url = `https://www.lumenn.xyz/api/create?createdBy=cmfsfsire000bz7ldi5cd8oqn&password=AP40HP1138&maxUses=${maxUses}`;
+
+    const res = await axios.get(url);
+
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      loadingMessage.message_id,
+      null,
+      `Generated code with ${maxUses} use(s):\n${res.data.code}`
+    );
+  } catch (err) {
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      loadingMessage.message_id,
+      null,
+      `Failed to generate code. Error: ${err.message}`
+    );
+    console.error(err);
+  }
+});
+
 setInterval(checkEndpoints, CHECK_INTERVAL);
 
 bot.telegram.setMyCommands([
+  { command: "health", description: "Show ts server /health endpoint data" },
+  {
+    command: "info",
+    description: "Show pairs info and matching engine status",
+  },
+  { command: "code", description: "Create a Invite Code" },
   { command: "status", description: "Show monitoring status" },
   { command: "stop", description: "Stop alerts" },
   { command: "resume", description: "Resume monitoring" },
   { command: "pause", description: "Pause monitoring" },
-  { command: "health", description: "Show /health endpoint data" },
-  { command: "info", description: "Show status + pairs info" },
 ]);
 
 bot.launch();
