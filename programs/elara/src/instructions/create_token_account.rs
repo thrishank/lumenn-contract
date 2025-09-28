@@ -76,9 +76,7 @@ pub struct CreateToken<'info> {
 
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    // pub jupiter_program: Program<'info, Jupiter>,
-    /// CHECK: This is the Jupiter program account
-    pub jupiter_program: UncheckedAccount<'info>,
+    pub jupiter_program: Program<'info, Jupiter>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -130,7 +128,6 @@ pub fn create_token_account<'info>(
         if jup_data.out_amount > ata_creation_amount + 1000 {
             return Err(error!(CustomError::InvalidOutAmount));
         }
-        // TODO: if over transfer the diff to maker. Transaction size limit ?
     }
 
     if jup_data.slippage_bps > 26 {
@@ -141,23 +138,23 @@ pub fn create_token_account<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
-    // let jupiter_accounts = &remaining[10..];
-    //
-    // validate_jupiter_accounts(
-    //     &jup_data.route,
-    //     jupiter_accounts,
-    //     ctx.accounts.input_mint.key(),
-    //     SOL_MINT,
-    //     ctx.accounts.input_token_program.key(),
-    //     ,
-    // )?;
-    //
-    // swap_cpi(
-    //     &args.swap_data,
-    //     jupiter_accounts,
-    //     &ctx.accounts.jupiter_program,
-    //     &ctx.accounts.protocol_vault.to_account_info(),
-    // )?;
+    let jupiter_accounts = &remaining[10..];
+
+    validate_jupiter_accounts(
+        &jup_data.route,
+        jupiter_accounts,
+        ctx.accounts.input_mint.key(),
+        SOL_MINT,
+        ctx.accounts.input_token_program.key(),
+        ctx.accounts.token_program.key(),
+    )?;
+
+    swap_cpi(
+        &args.swap_data,
+        jupiter_accounts,
+        &ctx.accounts.jupiter_program,
+        &ctx.accounts.protocol_vault.to_account_info(),
+    )?;
 
     transfer_tokens(&ctx, ata_creation_amount)?;
 

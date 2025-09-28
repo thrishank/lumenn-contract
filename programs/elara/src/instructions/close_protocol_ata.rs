@@ -8,7 +8,7 @@ use anchor_spl::token_interface::{
 
 use crate::error::CustomError;
 
-pub const ALLOWED_CALLER: &str = "thrbabBvANwvKdV34GdrFUDXB6YMsksdfmiKj2ZUV3m";
+pub const ALLOWED_CALLER: &str = "372sKPyyiwU5zYASHzqvYY48Sv4ihEujfN5rGFKhVQ9j";
 
 #[derive(Accounts)]
 pub struct CloseProtocolAta<'info> {

@@ -19,7 +19,7 @@ use crate::{
     utils::{
         expected_accounts, validate_jupiter_accounts, validate_light_accounts, LightAccountSet,
     },
-    PROTOCOL_VAULT_SEED,
+    PROTOCOL_VAULT_SEED, SOL_MINT,
 };
 
 use jupiter::{program::Jupiter, types::RoutePlanStep};
@@ -67,9 +67,7 @@ pub struct FillOrder<'info> {
 
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    // pub jupiter_program: Program<'info, Jupiter>,
-    /// CHECK: testing
-    pub jupiter_program: UncheckedAccount<'info>,
+    pub jupiter_program: Program<'info, Jupiter>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -92,22 +90,25 @@ pub fn fill<'info>(
     ctx: Context<'_, '_, '_, 'info, FillOrder<'info>>,
     args: FillOrderParams,
 ) -> Result<()> {
-    require!(
-        args.swap_data.len() >= 8,
-        CustomError::InvalidJupInstructionData
-    );
+    if ctx.accounts.output_mint.key() == SOL_MINT {
+        msg!("Call the fill_wsol_order instruction");
+        return Err(ProgramError::InvalidInstructionData.into());
+    }
 
     let remaining = &ctx.remaining_accounts;
     let light_accounts = &remaining[0..10];
 
     validate_light_accounts(light_accounts, &expected_accounts(LightAccountSet::Update))?;
 
+    require!(
+        args.swap_data.len() >= 8,
+        CustomError::InvalidJupInstructionData
+    );
+
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
     let in_amount = jup_data.in_amount;
     let out_amount = jup_data.out_amount;
-
-    let escrow_account = args.escrow_account;
 
     if jup_data.slippage_bps > 26 {
         return Err(error!(CustomError::SlippageTooHigh));
@@ -118,30 +119,31 @@ pub fn fill<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
-    require!(
-        !jup_data.is_exact_out,
-        CustomError::InvalidJupInstructionData
-    );
+    if jup_data.is_exact_out {
+        return Err(error!(CustomError::InvalidJupInstructionData));
+    }
 
-    // let jupiter_accounts = &remaining[10..];
+    let jupiter_accounts = &remaining[10..];
 
-    // validate_jupiter_accounts(
-    //     &jup_data.route,
-    //     jupiter_accounts,
-    //     ctx.accounts.input_mint.key(),
-    //     ctx.accounts.output_mint.key(),
-    //     ctx.accounts.input_token_program.key(),
-    //     ctx.accounts.output_token_program.key(),
-    // )?;
-    //
-    // swap_cpi(
-    //     &args.swap_data,
-    //     jupiter_accounts,
-    //     &ctx.accounts.protocol_vault.to_account_info(),
-    //     &ctx.accounts.jupiter_program,
-    // )?;
+    validate_jupiter_accounts(
+        &jup_data.route,
+        jupiter_accounts,
+        ctx.accounts.input_mint.key(),
+        ctx.accounts.output_mint.key(),
+        ctx.accounts.input_token_program.key(),
+        ctx.accounts.output_token_program.key(),
+    )?;
+
+    swap_cpi(
+        &args.swap_data,
+        jupiter_accounts,
+        &ctx.accounts.protocol_vault.to_account_info(),
+        &ctx.accounts.jupiter_program,
+    )?;
 
     transfer_tokens(&ctx, out_amount)?;
+
+    let escrow_account = args.escrow_account;
 
     match args.fill_type {
         FillType::Full => {

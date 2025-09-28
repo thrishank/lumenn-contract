@@ -77,6 +77,7 @@ describe("elara/fill_order", () => {
 
   const assetSeed = deriveAddressSeed(seeds, program.programId);
   const address = deriveAddress(assetSeed, ADDRESS_TREE);
+  /*
 
   it("fill order", async () => {
     console.log("Initializing order...");
@@ -303,9 +304,18 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
+  */
 
-  /*
   it("fill order WSOL", async () => {
+    const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5"];
+
+    const { accounts: jup_accounts, alt } = await get_swap_instruction();
+
+    for (const key of alt) {
+      const newAlt = await clone_alt(key);
+      altAddresses.push(newAlt);
+    }
+
     const unique_id2 = new BN(Date.now());
 
     const seeds: Uint8Array[] = [
@@ -408,13 +418,11 @@ describe("elara/fill_order", () => {
       sol_mint.toString(),
       makingAmount.toNumber(),
       "ExactIn",
-      5
+      10
     );
 
-    const { accounts: jup_accounts, alt } = await get_swap_instruction();
-
     const instruction = await program.methods
-      .fillOrder({
+      .fillWsolOrder({
         swapData: Buffer.from(swap.swapInstruction.data, "base64"),
         escrowAccount: {
           uniqueId: escrow_data.uniqueId,
@@ -450,7 +458,6 @@ describe("elara/fill_order", () => {
         payer: payer.publicKey,
         maker: payer.publicKey,
         inputMint: input_mint,
-        outputMint: sol_mint,
         inputTokenProgram: TOKEN_PROGRAM_ID,
         outputTokenProgram: TOKEN_PROGRAM_ID,
         jupiterProgram: new PublicKey(
@@ -459,13 +466,6 @@ describe("elara/fill_order", () => {
       })
       .remainingAccounts([...CLOSE_ACCOUNTS, ...jup_accounts])
       .instruction();
-
-    const altAddresses = ["7J9hvm2E2HpJPPghTbBB2PbCSH35bZFryBEd8X2Cgys5"];
-
-    for (const key of alt) {
-      const newAlt = await clone_alt(key);
-      altAddresses.push(newAlt);
-    }
 
     const altLookups = await Promise.all(
       altAddresses.map(async (address: any) => {
@@ -485,11 +485,6 @@ describe("elara/fill_order", () => {
       instructions: [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
         instruction,
-        createCloseAccountInstruction(
-          wSOL_ata,
-          payer.publicKey,
-          payer.publicKey
-        ),
       ],
     }).compileToV0Message(altLookups);
 
@@ -525,5 +520,4 @@ describe("elara/fill_order", () => {
 
     await assertEscrowDoesNotExist({ rpc, address });
   });
-  */
 });

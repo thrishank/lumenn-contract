@@ -90,6 +90,10 @@ pub fn update<'info>(
         CustomError::SameMints
     );
 
+    if args.making_amount.is_some() ^ args.taking_amount.is_some() {
+        return err!(CustomError::InvalidAmount);
+    }
+
     if let Some(ma) = args.making_amount {
         require!(ma > 0, CustomError::InvalidAmount);
     }

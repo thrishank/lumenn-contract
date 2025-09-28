@@ -41,7 +41,7 @@ pub struct FillOrderWSol<'info> {
     )]
     pub payer_wsol_ata: InterfaceAccount<'info, TokenAccount>,
 
-    /// CHECK: check maker.key == order.maker
+    /// CHECK: Light Checks
     #[account(mut)]
     pub maker: UncheckedAccount<'info>,
 
@@ -85,31 +85,26 @@ pub struct FillOrderWSol<'info> {
 
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    // pub jupiter_program: Program<'info, Jupiter>,
-    /// CHECK: testing
-    pub jupiter_program: UncheckedAccount<'info>,
+    pub jupiter_program: Program<'info, Jupiter>,
 }
 
 pub fn fill<'info>(
     ctx: Context<'_, '_, '_, 'info, FillOrderWSol<'info>>,
     args: FillOrderParams,
 ) -> Result<()> {
+    let remaining = &ctx.remaining_accounts;
+    let light_accounts = &remaining[0..10];
+
+    validate_light_accounts(light_accounts, &expected_accounts(LightAccountSet::Update))?;
     require!(
         args.swap_data.len() >= 8,
         CustomError::InvalidJupInstructionData
     );
 
-    let remaining = &ctx.remaining_accounts;
-    let light_accounts = &remaining[0..10];
-
-    validate_light_accounts(light_accounts, &expected_accounts(LightAccountSet::Update))?;
-
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
     let in_amount = jup_data.in_amount;
     let out_amount = jup_data.out_amount;
-
-    let escrow_account = args.escrow_account;
 
     if jup_data.slippage_bps > 26 {
         return Err(error!(CustomError::SlippageTooHigh));
@@ -119,32 +114,36 @@ pub fn fill<'info>(
         return Err(error!(CustomError::InvalidPlatformFeeBps));
     }
 
-    if !jup_data.is_exact_out {
+    if jup_data.is_exact_out {
         return Err(error!(CustomError::InvalidJupInstructionData));
     }
 
-    // let jupiter_accounts = &remaining[10..];
+    let jupiter_accounts = &remaining[10..];
 
-    // validate_jupiter_accounts(
-    //     &jup_data.route,
-    //     jupiter_accounts,
-    //     ctx.accounts.input_mint.key(),
-    //     ctx.accounts.sol_mint.key(),
-    //     ctx.accounts.input_token_program.key(),
-    //     ctx.accounts.output_token_program.key(),
-    // )?;
+    validate_jupiter_accounts(
+        &jup_data.route,
+        jupiter_accounts,
+        ctx.accounts.input_mint.key(),
+        ctx.accounts.sol_mint.key(),
+        ctx.accounts.input_token_program.key(),
+        ctx.accounts.output_token_program.key(),
+    )?;
 
-    // swap_cpi(
-    //     &args.swap_data,
-    //     jupiter_accounts,
-    //     &ctx.accounts.protocol_vault.to_account_info(),
-    //     &ctx.accounts.jupiter_program,
-    // )?;
+    swap_cpi(
+        &args.swap_data,
+        jupiter_accounts,
+        &ctx.accounts.protocol_vault.to_account_info(),
+        &ctx.accounts.jupiter_program,
+    )?;
 
     let rent = Rent::get()?;
     let ata_creation_amount = rent.minimum_balance(TOKEN_ACCOUNT_SIZE as usize);
 
     let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
+
+    let temp_amount = out_amount
+        .checked_sub(ata_creation_amount)
+        .ok_or(CustomError::InvalidAmount)?;
 
     transfer_checked(
         CpiContext::new_with_signer(
@@ -160,7 +159,7 @@ pub fn fill<'info>(
             },
             signer_seeds,
         ),
-        out_amount - ata_creation_amount,
+        temp_amount,
         ctx.accounts.sol_mint.decimals,
     )?;
 
@@ -193,6 +192,8 @@ pub fn fill<'info>(
         },
         &temp_signer_seeds,
     ))?;
+
+    let escrow_account = args.escrow_account;
 
     match args.fill_type {
         FillType::Full => {

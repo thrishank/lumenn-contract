@@ -11,11 +11,11 @@ use light_sdk::{
 
 use crate::{
     error::CustomError,
+    parse_jupiter_route_data,
     state::{AccountParams, EscrowAccount, Tokens},
     utils::{expected_accounts, validate_light_accounts, LightAccountSet},
     LIGHT_CPI_SIGNER, PROTOCOL_VAULT_SEED,
 };
-use crate::{parse_jupiter_route_data, SOL_MINT};
 
 #[derive(Accounts)]
 pub struct CreateTokenWsol<'info> {
@@ -83,10 +83,6 @@ pub fn create_token_account<'info>(
     ctx: Context<'_, '_, '_, 'info, CreateTokenWsol<'info>>,
     args: CreateTokenAccountWsolArgs,
 ) -> Result<()> {
-    if ctx.accounts.output_mint.key() == SOL_MINT {
-        return Err(error!(CustomError::InvalidOutputMint));
-    };
-
     validate_light_accounts(
         ctx.remaining_accounts,
         &expected_accounts(LightAccountSet::Update),
@@ -98,7 +94,7 @@ pub fn create_token_account<'info>(
     let ata_creation_amount =
         rent.minimum_balance(ctx.accounts.maker_token_ata.to_account_info().data_len());
 
-    // taking amount need to sub the
+    // taking amount that is need to subtract in the state
     if jup_data.out_amount != ata_creation_amount {
         return Err(error!(CustomError::InvalidOutAmount));
     }

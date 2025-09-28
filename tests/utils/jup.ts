@@ -25,10 +25,10 @@ export async function get_swap(
     data: JSON.stringify({
       userPublicKey: address,
       quoteResponse: quote.data,
-      feeAccount: address,
+      // feeAccount: address,
     }),
   };
-  const swap = await axios.request(config);
+  let swap = await axios.request(config);
 
   const accounts = swap.data.swapInstruction.accounts.map((acc: any) => ({
     pubkey: new PublicKey(acc.pubkey),
@@ -53,7 +53,7 @@ export async function get_swap_instruction() {
     new PublicKey("9RzWC4ZS6LdNUP2LwaY7Ztq5sTxgt3dFLp2jjokhm9Vz"),
     fee_pubkey
   );
-  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN&outputMint=Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB&amount=100000000&slippageBps=10&platformFeeBps=10&maxAccounts=40&onlyDirectRoutes=true`;
+  const quote_url = `https://lite-api.jup.ag/swap/v1/quote?inputMint=Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB&outputMint=So11111111111111111111111111111111111111112&amount=100000000&slippageBps=10&platformFeeBps=10`;
 
   const quote = await axios.get(quote_url);
   let config = {

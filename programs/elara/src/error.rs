@@ -23,7 +23,7 @@ pub enum CustomError {
     #[msg("Token account already exists")]
     TokenAccountAlreadyExists,
 
-    #[msg("Invalid Jupiter instruction data: must be an exact-out route or shared-accounts exact-out route")]
+    #[msg("Invalid Jupiter instruction data. Data length is less than 8 or is an exact-out route or shared-accounts exact-out route")]
     InvalidJupInstructionData,
 
     #[msg("Invalid input amount: must match the escrow account's making amount")]
