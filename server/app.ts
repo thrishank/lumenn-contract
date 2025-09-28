@@ -1,6 +1,6 @@
 import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
-import { Elara } from "../target/types/elara";
-import IDL from "../target/idl/elara.json";
+import { Elara } from "../elara";
+import IDL from "../elara.json";
 import {
   Connection,
   Keypair,
