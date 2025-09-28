@@ -207,7 +207,7 @@ bot.command("code", async (ctx) => {
       maxUses = parseInt(args[0]);
     }
 
-    const url = `https://www.lumenn.xyz/api/create?createdBy=cmfsfsire000bz7ldi5cd8oqn&password=AP40HP1138&maxUses=${maxUses}`;
+    const url = `https://www.lumenn.xyz/api/create?createdBy=cmfza8ryb0001kw047slwm80j&password=AP40HP1138&maxUses=${maxUses}`;
 
     const res = await axios.get(url);
 
