@@ -84,9 +84,6 @@ export async function fill(
       outputMint: escrow_data.tokens.outputMint,
       inputTokenProgram: escrow_data.tokens.inputTokenProgram,
       outputTokenProgram: escrow_data.tokens.outputTokenProgram,
-      jupiterProgram: new PublicKey(
-        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
-      ),
     })
     .remainingAccounts([...CLOSE_ACCOUNTS, ...accounts])
     .instruction();
@@ -187,9 +184,6 @@ export async function fill_wsol(
       inputMint: escrow_data.tokens.inputMint,
       inputTokenProgram: escrow_data.tokens.inputTokenProgram,
       outputTokenProgram: escrow_data.tokens.outputTokenProgram,
-      jupiterProgram: new PublicKey(
-        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
-      ),
     })
     .remainingAccounts([...CLOSE_ACCOUNTS, ...accounts])
     .instruction();
