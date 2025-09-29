@@ -73,7 +73,7 @@ app.get("/health", async (req, res) => {
     await Promise.race([
       connection.getSlot(),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), 5000)
+        setTimeout(() => reject(new Error("timeout")), 10000)
       ),
     ]);
 

@@ -79,7 +79,7 @@ async function sendAlert(message: string) {
         return;
       }
       await bot.telegram.sendMessage(ids[0], message);
-    }, 15_000); // send every 15s until stopped
+    }, 60 * 1000); // send every 1Min until stopped
   }
 }
 
@@ -182,6 +182,9 @@ bot.command("info", async (ctx) => {
     const msg = `
 === Status ===
 Running: ${status.is_running ? "Yes" : "No"}
+Logs Socket Running: ${status.logs_socket_running ? "Yes" : "No"}
+Pyth Running: ${status.pyth_running ? "Yes" : "No"}
+JUP Running: ${status.jup_running ? "Yes" : "No"}
 Total Orders: ${status.total_orders}
 Total Pairs: ${status.total_pairs}
 
