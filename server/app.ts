@@ -104,15 +104,6 @@ app.get("/metrics", (req, res) => {
   });
 });
 
-// TODO: set up the webhook when the server is live
-app.post("/idl", (req, res) => {
-  // C88XWfp26heEmDkmfSzeXP7Fd7GQJ2j9dDTUsyiZbUTa;
-  bot.telegram.sendMessage(
-    1520778961,
-    "idl changed. Update to the new one ASAP"
-  );
-});
-
 app.get(
   "/fill",
   async (
@@ -167,7 +158,7 @@ app.get(
         expiredAt: new Date(expiredAt).toISOString(),
       });
 
-      if (expiredAt != 0 && expiredAt <= Date.now()) {
+      if (expiredAt !== 0 && expiredAt <= Date.now()) {
         throw new Error("Order has expired");
       }
 

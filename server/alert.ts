@@ -25,6 +25,8 @@ let monitoring = true;
 let alerting = false;
 let stopTimestamp: number | null = null;
 
+let socket_down_count = 0;
+
 async function checkEndpoints() {
   if (!monitoring) return;
 
@@ -57,9 +59,25 @@ async function checkEndpoints() {
         ];
 
         for (const check of statusChecks) {
-          if (!res.data?.[check.key]) {
+          if (!res.data?.[check.key] && check.key !== "logs_socket_running") {
             await sendAlert(`Endpoint ${url} is not running. ${check.message}`);
             break;
+          }
+
+          if (check.key === "logs_socket_running") {
+            socket_down_count++;
+            if (socket_down_count > 10) {
+              await sendAlert(
+                `Endpoint ${url} is not running. ${check.message}`
+              );
+              break;
+            }
+
+            if (!res.data?.logs_socket_running) {
+              socket_down_count++;
+            } else {
+              socket_down_count = 0;
+            }
           }
         }
       }
