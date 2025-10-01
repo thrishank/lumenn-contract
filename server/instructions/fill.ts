@@ -13,7 +13,7 @@ import {
   CLOSE_ACCOUNTS,
 } from "../../tests/utils/address";
 import { parseEscrowFromBuffer } from "../../tests/utils/fn";
-import { retryOperation } from "../utils";
+import { getComputeUnitsUsed, retryOperation } from "../utils";
 
 export async function fill(
   address: PublicKey,
@@ -101,12 +101,26 @@ export async function fill(
     })
   );
 
+  const tx_sim = new VersionedTransaction(
+    new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: "",
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_390_000 }),
+        instruction,
+      ],
+    }).compileToV0Message(altLookups)
+  );
+
+  const CU = await getComputeUnitsUsed(tx_sim);
+
   const latestBlockhash = await rpc.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: payer.publicKey,
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: CU }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 }),
       instruction,
     ],
   }).compileToV0Message(altLookups);
@@ -201,12 +215,26 @@ export async function fill_wsol(
     })
   );
 
+  const tx_sim = new VersionedTransaction(
+    new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: "",
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_390_000 }),
+        instruction,
+      ],
+    }).compileToV0Message(altLookups)
+  );
+
+  const CU = await getComputeUnitsUsed(tx_sim);
+
   const latestBlockhash = await rpc.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: payer.publicKey,
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: CU }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 }),
       instruction,
     ],
   }).compileToV0Message(altLookups);

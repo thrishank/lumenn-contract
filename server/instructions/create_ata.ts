@@ -17,7 +17,7 @@ import { get_swap_instruction } from "../jup";
 import BN from "bn.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { get_rent_quote } from "../token-2022";
-import { logger } from "../utils";
+import { getComputeUnitsUsed, logger } from "../utils";
 
 const sol_mint = new PublicKey("So11111111111111111111111111111111111111112");
 
@@ -170,12 +170,26 @@ export async function create_ata(
     })
   );
 
+  const tx_sim = new VersionedTransaction(
+    new TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: "",
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_390_000 }),
+        instruction,
+      ],
+    }).compileToV0Message(altLookups)
+  );
+
+  const CU = await getComputeUnitsUsed(tx_sim);
+
   const latestBlockhash = await rpc.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: payer.publicKey,
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: CU }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 }),
       instruction,
     ],
   }).compileToV0Message(altLookups);
@@ -286,7 +300,8 @@ export async function create_ata_wsol(
     payerKey: payer.publicKey,
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 350_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 }),
       instruction,
     ],
   }).compileToV0Message(altLookups);

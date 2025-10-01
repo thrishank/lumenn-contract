@@ -107,6 +107,7 @@ export async function expire(address: PublicKey) {
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [
       ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 }),
       instruction,
     ],
   }).compileToV0Message(ALT_CACHE);
@@ -182,6 +183,7 @@ export async function expire_wsol(address: PublicKey) {
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [
       ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 }),
       instruction,
     ],
   }).compileToV0Message(ALT_CACHE);

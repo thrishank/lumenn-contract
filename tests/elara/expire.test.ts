@@ -118,7 +118,7 @@ describe("elara/expire_order", () => {
           uniqueId: unique_id,
           makingAmount,
           takingAmount,
-          expiredAt: new BN(now + 3),
+          expiredAt: new BN(now + 2),
         },
         {
           proof: {

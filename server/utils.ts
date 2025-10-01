@@ -3,6 +3,8 @@ import path from "path";
 import express from "express";
 import winston from "winston";
 import tokensData from "./../tokens.json";
+import { VersionedTransaction } from "@solana/web3.js";
+import { rpc } from "./app";
 
 const logsDir = path.join(process.cwd(), "logs");
 if (!fs.existsSync(logsDir)) {
@@ -239,4 +241,23 @@ async function fetch_token_data(mint: string) {
   tokenMap.set(token.id, token);
 
   return token;
+}
+
+export async function getComputeUnitsUsed(
+  tx: VersionedTransaction
+): Promise<number> {
+  const sim = await rpc.simulateTransaction(tx, {
+    sigVerify: false,
+    replaceRecentBlockhash: true,
+  });
+
+  if (sim.value.err) {
+    throw new Error("Simulation failed: " + JSON.stringify(sim.value.err));
+  }
+
+  const unitsConsumed = sim.value.unitsConsumed ?? 0;
+  if (unitsConsumed > 1_380_000) {
+    return unitsConsumed;
+  }
+  return unitsConsumed + 10_000;
 }
