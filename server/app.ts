@@ -26,6 +26,11 @@ import {
 } from "./utils";
 import { bot } from "./alert";
 
+bot.use((ctx, next) => {
+  console.log(ctx.message);
+  return next();
+});
+
 dotenv.config();
 
 if (!process.env.KEY) {

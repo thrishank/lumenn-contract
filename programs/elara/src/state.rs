@@ -16,9 +16,6 @@ pub struct EscrowAccount {
     pub fee_bps: u16,
 }
 
-// TODO: removing created_at and update_at could save 16 bytes. Not really using the updated_at
-// anywhere in the client side and created_at can be derived from the slot which is provided in rpc
-
 #[derive(
     Debug, Clone, Copy, Default, AnchorDeserialize, AnchorSerialize, LightDiscriminator, LightHasher,
 )]

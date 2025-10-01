@@ -5,11 +5,6 @@ export const bot = new Telegraf(
   "7887692704:AAE9g8oEGMB-REyHu7ZITvzrVLOG10f11Mc"
 );
 
-bot.use((ctx, next) => {
-  console.log(ctx.message);
-  return next();
-});
-
 const ids = [1520778961];
 
 const CHECK_INTERVAL = 30_000; // 30s
