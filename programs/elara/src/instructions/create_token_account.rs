@@ -32,9 +32,14 @@ pub struct CreateToken<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// CHECK: Payer’s WSOL ATA and check if it already exists
-    #[account(mut)]
-    pub payer_wsol_ata: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = sol_mint,
+        associated_token::authority = payer,
+        associated_token::token_program = token_program
+    )]
+    pub payer_wsol_ata: InterfaceAccount<'info, TokenAccount>,
 
     /// CHECK: Maker account  
     pub maker: AccountInfo<'info>,
@@ -64,8 +69,14 @@ pub struct CreateToken<'info> {
     pub protocol_vault: SystemAccount<'info>,
 
     /// CHECK: Protocol WSOL ATA
-    #[account(mut)]
-    pub protocol_wsol_ata: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = sol_mint,
+        associated_token::authority = protocol_vault,
+        associated_token::token_program = token_program
+    )]
+    pub protocol_wsol_ata: InterfaceAccount<'info, TokenAccount>,
 
     /// CHECK: Hardcoded SPL Token program
     #[account(address = spl_token::ID)]
@@ -115,21 +126,6 @@ pub fn create_token_account<'info>(
     let ata_creation_amount =
         rent.minimum_balance(ctx.accounts.maker_token_ata.to_account_info().data_len());
 
-    if jup_data.is_exact_out && jup_data.out_amount != ata_creation_amount {
-        return Err(error!(CustomError::InvalidOutAmount));
-    }
-
-    if !jup_data.is_exact_out {
-        if jup_data.out_amount < ata_creation_amount {
-            return Err(error!(CustomError::InvalidOutAmount));
-        }
-
-        // 1000 lamports tolarance
-        if jup_data.out_amount > ata_creation_amount + 1000 {
-            return Err(error!(CustomError::InvalidOutAmount));
-        }
-    }
-
     if jup_data.slippage_bps > 26 {
         return Err(error!(CustomError::SlippageTooHigh));
     }
@@ -149,12 +145,35 @@ pub fn create_token_account<'info>(
         ctx.accounts.token_program.key(),
     )?;
 
+    let balance_before_swap = ctx.accounts.protocol_wsol_ata.amount;
+
     swap_cpi(
         &args.swap_data,
         jupiter_accounts,
-        &ctx.accounts.jupiter_program,
         &ctx.accounts.protocol_vault.to_account_info(),
+        &ctx.accounts.jupiter_program,
     )?;
+
+    let balance_after_swap = ctx.accounts.protocol_wsol_ata.amount;
+
+    let diff = balance_after_swap
+        .checked_sub(balance_before_swap)
+        .ok_or(ProgramError::ArithmeticOverflow)?;
+
+    if jup_data.is_exact_out && diff != ata_creation_amount {
+        return Err(error!(CustomError::InvalidOutAmount));
+    }
+
+    if !jup_data.is_exact_out {
+        if diff < ata_creation_amount {
+            return Err(error!(CustomError::InvalidOutAmount));
+        }
+
+        // 1000 lamports tolarance
+        if diff > ata_creation_amount + 1000 {
+            return Err(error!(CustomError::InvalidOutAmount));
+        }
+    }
 
     transfer_tokens(&ctx, ata_creation_amount)?;
 

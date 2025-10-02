@@ -108,7 +108,6 @@ pub fn fill<'info>(
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
     let in_amount = jup_data.in_amount;
-    let out_amount = jup_data.out_amount;
 
     if jup_data.slippage_bps > 26 {
         return Err(error!(CustomError::SlippageTooHigh));
@@ -134,6 +133,8 @@ pub fn fill<'info>(
         ctx.accounts.output_token_program.key(),
     )?;
 
+    let before_swap = ctx.accounts.protocol_vault_output_mint_ata.amount;
+
     swap_cpi(
         &args.swap_data,
         jupiter_accounts,
@@ -141,7 +142,15 @@ pub fn fill<'info>(
         &ctx.accounts.jupiter_program,
     )?;
 
-    transfer_tokens(&ctx, out_amount)?;
+    ctx.accounts.protocol_vault_output_mint_ata.reload()?;
+
+    let after_swap = ctx.accounts.protocol_vault_output_mint_ata.amount;
+
+    let diff = after_swap
+        .checked_sub(before_swap)
+        .ok_or(ProgramError::ArithmeticOverflow)?;
+
+    transfer_tokens(&ctx, diff)?;
 
     let escrow_account = args.escrow_account;
 
@@ -151,7 +160,7 @@ pub fn fill<'info>(
                 return Err(error!(CustomError::InvalidInAmount));
             }
 
-            if out_amount < escrow_account.amount.taking_amount {
+            if escrow_account.amount.taking_amount > diff {
                 return Err(error!(CustomError::LowTakingAmount));
             }
 
@@ -164,7 +173,7 @@ pub fn fill<'info>(
                 output_mint: ctx.accounts.output_mint.key(),
                 unique_id: escrow_account.unique_id,
                 in_amount,
-                out_amount: escrow_account.amount.taking_amount,
+                out_amount: diff,
                 fee_bps: escrow_account.fee_bps,
                 fill_type: FillType::Full,
             });
@@ -182,12 +191,11 @@ pub fn fill<'info>(
                 .checked_div(escrow_account.amount.making_amount)
                 .ok_or(ProgramError::ArithmeticOverflow)?;
 
-            if out_amount < taking_amount {
+            if taking_amount > diff {
                 return Err(error!(CustomError::LowTakingAmount));
             }
 
-            let escrow_address =
-                light_cpi_update(&ctx, light_accounts, &args, in_amount, out_amount)?;
+            let escrow_address = light_cpi_update(&ctx, light_accounts, &args, in_amount, diff)?;
 
             emit!(FillEvent {
                 escrow_address,
@@ -196,7 +204,7 @@ pub fn fill<'info>(
                 output_mint: ctx.accounts.output_mint.key(),
                 unique_id: escrow_account.unique_id,
                 in_amount,
-                out_amount,
+                out_amount: diff,
                 fee_bps: escrow_account.fee_bps,
                 fill_type: FillType::Partial,
             });
