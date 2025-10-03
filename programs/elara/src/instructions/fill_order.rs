@@ -108,8 +108,12 @@ pub fn fill<'info>(
     let jup_data = parse_jupiter_route_data(&args.swap_data)?;
 
     let in_amount = jup_data.in_amount;
+    // let out_amount = jup_data.out_amount;
+    // TODO: change in frontend to
+    // NOTE: the amount we get here already deducts the fee
+    // so if the taking amount is 100 USDC and fee is 0.1% so here we get 99.9 USDC
 
-    if jup_data.slippage_bps > 26 {
+    if jup_data.slippage_bps > 50 {
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
@@ -133,7 +137,7 @@ pub fn fill<'info>(
         ctx.accounts.output_token_program.key(),
     )?;
 
-    let before_swap = ctx.accounts.protocol_vault_output_mint_ata.amount;
+    let balance_before_swap = ctx.accounts.protocol_vault_output_mint_ata.amount;
 
     swap_cpi(
         &args.swap_data,
@@ -144,10 +148,10 @@ pub fn fill<'info>(
 
     ctx.accounts.protocol_vault_output_mint_ata.reload()?;
 
-    let after_swap = ctx.accounts.protocol_vault_output_mint_ata.amount;
+    let balance_after_swap = ctx.accounts.protocol_vault_output_mint_ata.amount;
 
-    let diff = after_swap
-        .checked_sub(before_swap)
+    let diff = balance_after_swap
+        .checked_sub(balance_before_swap)
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
     transfer_tokens(&ctx, diff)?;
@@ -160,7 +164,24 @@ pub fn fill<'info>(
                 return Err(error!(CustomError::InvalidInAmount));
             }
 
-            if escrow_account.amount.taking_amount > diff {
+            // let expected_after_fee = escrow_account
+            //     .amount
+            //     .taking_amount
+            //     .checked_mul((10_000u64 - escrow_account.fee_bps as u64))
+            //     .ok_or(ProgramError::ArithmeticOverflow)?
+            //     .checked_div(10_000)
+            //     .ok_or(ProgramError::ArithmeticOverflow)?;
+
+            // NOTE: hard coded 0.1% fee for now
+            let expected_after_fee = escrow_account
+                .amount
+                .taking_amount
+                .checked_mul(999)
+                .ok_or(ProgramError::ArithmeticOverflow)?
+                .checked_div(1000)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+
+            if expected_after_fee > diff {
                 return Err(error!(CustomError::LowTakingAmount));
             }
 
@@ -191,7 +212,13 @@ pub fn fill<'info>(
                 .checked_div(escrow_account.amount.making_amount)
                 .ok_or(ProgramError::ArithmeticOverflow)?;
 
-            if taking_amount > diff {
+            let expected_after_fee = taking_amount
+                .checked_mul(999)
+                .ok_or(ProgramError::ArithmeticOverflow)?
+                .checked_div(1000)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+
+            if expected_after_fee > diff {
                 return Err(error!(CustomError::LowTakingAmount));
             }
 

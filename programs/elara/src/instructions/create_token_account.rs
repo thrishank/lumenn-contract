@@ -126,7 +126,7 @@ pub fn create_token_account<'info>(
     let ata_creation_amount =
         rent.minimum_balance(ctx.accounts.maker_token_ata.to_account_info().data_len());
 
-    if jup_data.slippage_bps > 26 {
+    if jup_data.slippage_bps > 50 {
         return Err(error!(CustomError::SlippageTooHigh));
     }
 

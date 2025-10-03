@@ -105,7 +105,7 @@ pub fn fill<'info>(
 
     let in_amount = jup_data.in_amount;
 
-    if jup_data.slippage_bps > 26 {
+    if jup_data.slippage_bps > 50 {
         return Err(error!(CustomError::SlippageTooHigh));
     }
 
@@ -210,7 +210,15 @@ pub fn fill<'info>(
                 return Err(error!(CustomError::InvalidInAmount));
             }
 
-            if escrow_account.amount.taking_amount > diff {
+            let expected_after_fee = escrow_account
+                .amount
+                .taking_amount
+                .checked_mul(999)
+                .ok_or(ProgramError::ArithmeticOverflow)?
+                .checked_div(1000)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+
+            if expected_after_fee > diff {
                 return Err(error!(CustomError::LowTakingAmount));
             }
 
@@ -241,7 +249,13 @@ pub fn fill<'info>(
                 .checked_div(escrow_account.amount.making_amount)
                 .ok_or(ProgramError::ArithmeticOverflow)?;
 
-            if taking_amount > diff {
+            let expected_after_fee = taking_amount
+                .checked_mul(999)
+                .ok_or(ProgramError::ArithmeticOverflow)?
+                .checked_div(1000)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+
+            if expected_after_fee > diff {
                 return Err(error!(CustomError::LowTakingAmount));
             }
 
