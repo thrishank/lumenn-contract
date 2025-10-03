@@ -146,9 +146,7 @@ export async function create_ata(
     })
     .accounts({
       payer: payer.publicKey,
-      payerWsolAta: payer_ata,
       maker: escrow_data.maker,
-      protocolWsolAta: protocol_ata,
       inputMint: escrow_data.tokens.inputMint,
       outputMint: escrow_data.tokens.outputMint,
       inputTokenProgram: escrow_data.tokens.inputTokenProgram,
