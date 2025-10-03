@@ -182,7 +182,7 @@ export async function expire_wsol(address: PublicKey) {
     payerKey: payer.publicKey,
     recentBlockhash: latestBlockhash.blockhash,
     instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 320_000 }),
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 }),
       instruction,
     ],

@@ -160,6 +160,8 @@ pub fn create_token_account<'info>(
         .checked_sub(balance_before_swap)
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
+    require!(diff > 0, CustomError::NoTokensReceived);
+
     if jup_data.is_exact_out && diff != ata_creation_amount {
         return Err(error!(CustomError::InvalidOutAmount));
     }

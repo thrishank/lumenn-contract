@@ -251,6 +251,8 @@ export async function getComputeUnitsUsed(
     replaceRecentBlockhash: true,
   });
 
+  console.log("simulation", sim);
+
   if (sim.value.err) {
     throw new Error("Simulation failed: " + JSON.stringify(sim.value.err));
   }

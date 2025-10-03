@@ -154,6 +154,8 @@ pub fn fill<'info>(
         .checked_sub(balance_before_swap)
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
+    require!(diff > 0, CustomError::NoTokensReceived);
+
     transfer_tokens(&ctx, diff)?;
 
     let escrow_account = args.escrow_account;

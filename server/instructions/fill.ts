@@ -12,8 +12,11 @@ import {
   ADDRESS_TREE,
   CLOSE_ACCOUNTS,
 } from "../../tests/utils/address";
-import { parseEscrowFromBuffer } from "../../tests/utils/fn";
-import { getComputeUnitsUsed, retryOperation } from "../utils";
+import {
+  calculateTransactionSize,
+  parseEscrowFromBuffer,
+} from "../../tests/utils/fn";
+import { getComputeUnitsUsed, logger, retryOperation } from "../utils";
 
 export async function fill(
   address: PublicKey,
@@ -104,7 +107,7 @@ export async function fill(
   const tx_sim = new VersionedTransaction(
     new TransactionMessage({
       payerKey: payer.publicKey,
-      recentBlockhash: "",
+      recentBlockhash: "DYFUNubBm23g4yaEhqd78HCnCVo4uiexgFiEKRhpw9EX",
       instructions: [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_390_000 }),
         instruction,
@@ -113,6 +116,8 @@ export async function fill(
   );
 
   const CU = await getComputeUnitsUsed(tx_sim);
+
+  logger.info(`CU needed ${CU}`);
 
   const latestBlockhash = await rpc.getLatestBlockhash();
   const message = new TransactionMessage({
@@ -126,6 +131,9 @@ export async function fill(
   }).compileToV0Message(altLookups);
 
   const tx = new VersionedTransaction(message);
+
+  const size = calculateTransactionSize(tx);
+  console.log(size, alt.length);
 
   return tx;
 }
@@ -218,7 +226,7 @@ export async function fill_wsol(
   const tx_sim = new VersionedTransaction(
     new TransactionMessage({
       payerKey: payer.publicKey,
-      recentBlockhash: "",
+      recentBlockhash: "DYFUNubBm23g4yaEhqd78HCnCVo4uiexgFiEKRhpw9EX",
       instructions: [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_390_000 }),
         instruction,
@@ -240,6 +248,8 @@ export async function fill_wsol(
   }).compileToV0Message(altLookups);
 
   const tx = new VersionedTransaction(message);
+  const size = calculateTransactionSize(tx);
+  console.log(size, alt.length);
 
   return tx;
 }

@@ -145,8 +145,12 @@ pub fn fill<'info>(
         .checked_sub(balance_before_swap)
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
+    require!(diff > 0, CustomError::NoTokensReceived);
+
     let rent = Rent::get()?;
     let ata_creation_amount = rent.minimum_balance(TOKEN_ACCOUNT_SIZE as usize);
+
+    require!(diff > ata_creation_amount, CustomError::SwapOutputTooSmall);
 
     let signer_seeds: &[&[&[u8]]] = &[&[PROTOCOL_VAULT_SEED, &[ctx.bumps.protocol_vault]]];
 

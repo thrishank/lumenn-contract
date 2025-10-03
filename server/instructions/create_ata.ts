@@ -34,7 +34,7 @@ export async function create_ata(
 
   const validityProof = proof.compressedProof;
 
-  if (escrow_data.tokens.inputMint === sol_mint) {
+  if (escrow_data.tokens.inputMint.equals(sol_mint)) {
     throw new Error("call create wSOL instruction");
   }
 
@@ -173,7 +173,7 @@ export async function create_ata(
   const tx_sim = new VersionedTransaction(
     new TransactionMessage({
       payerKey: payer.publicKey,
-      recentBlockhash: "",
+      recentBlockhash: "DYFUNubBm23g4yaEhqd78HCnCVo4uiexgFiEKRhpw9EX",
       instructions: [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1_390_000 }),
         instruction,
@@ -214,7 +214,7 @@ export async function create_ata_wsol(
 
   const validityProof = proof.compressedProof;
 
-  if (escrow_data.tokens.inputMint != sol_mint) {
+  if (!escrow_data.tokens.inputMint.equals(sol_mint)) {
     throw new Error("call create ata instruction");
   }
 
@@ -233,8 +233,7 @@ export async function create_ata_wsol(
     sol_mint.toString(),
     2039280,
     "ExactOut",
-    0,
-    true
+    0
   );
 
   const instruction = await program.methods
@@ -340,6 +339,8 @@ export async function create_token_ata(
     } else {
       await create_ata(compressed_account, escrow_data);
     }
+
+    await new Promise((res) => setTimeout(res, 3000));
 
     // Verify ATA was created
     const ataVerification = await rpc.getAccountInfo(ata, "processed");

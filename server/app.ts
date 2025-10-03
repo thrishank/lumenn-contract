@@ -38,7 +38,10 @@ if (!process.env.KEY) {
   process.exit(1);
 }
 
-const connection = new Connection("https://api.devnet.solana.com");
+const url =
+  "https://mainnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
+
+const connection = new Connection(url);
 
 export let payer: Keypair;
 try {
@@ -54,9 +57,6 @@ try {
 
 const provider = new AnchorProvider(connection, new Wallet(payer), {});
 export const program = new Program<Elara>(IDL as Elara, provider);
-
-const url =
-  "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
 
 export const rpc = createRpc(url, url, url);
 
@@ -168,11 +168,9 @@ app.get(
       }
 
       // This functions creates the ata if it doesn't exisit
-      let ata_created = await create_token_ata(
-        compressed_account,
-        escrow_data,
-        requestId
-      );
+      let ata_created = escrow_data.tokens.outputMint.equals(SOL_MINT)
+        ? false
+        : await create_token_ata(compressed_account, escrow_data, requestId);
 
       const { current_ratio } = await get_price(
         inputMint.toString(),
@@ -224,12 +222,14 @@ app.get(
       } else {
         finalInstructionData = fill_data.instruction_data;
         finalAccounts = fill_data.accounts;
-        finalAlt = fill_data.accounts;
+        finalAlt = fill_data.alt;
       }
 
       if (!finalInstructionData) {
         throw new Error("Swap Quote not found to fill the order");
       }
+
+      logger.info(`alt length: ${finalAlt.length}`);
 
       if (finalAlt.length > 2) {
         const { instruction_data, accounts, alt } = await get_swap_instruction(

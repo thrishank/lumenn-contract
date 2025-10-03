@@ -105,4 +105,10 @@ pub enum CustomError {
 
     #[msg("Mekle Tree pubkey is invalid")]
     InvalidMerkleTreePubkey,
+
+    #[msg("Output tokens not recived in Jupiter Swap")]
+    NoTokensReceived,
+
+    #[msg("Output Sol amount to Small to complete the ixs")]
+    SwapOutputTooSmall,
 }

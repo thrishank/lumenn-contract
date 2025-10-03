@@ -6,7 +6,7 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { payer, rpc } from "./app";
-import { tokenMap } from "./utils";
+import { logger, tokenMap } from "./utils";
 
 export async function get_quote(
   input_mint: string,
@@ -38,10 +38,11 @@ export async function get_swap_instruction(
 ) {
   const fee_acc = await create_fee_ata(new PublicKey(input_mint));
 
+  // TODO: make slippage dyanmic based on simulation
   let quote_url =
     `https://lite-api.jup.ag/swap/v1/quote?` +
     `inputMint=${input_mint}&outputMint=${output_mint}` +
-    `&amount=${amount}&swapMode=${swapMode}&slippageBps=0&onlyDirectRoutes=${onlyDirectRoutes}`;
+    `&amount=${amount}&swapMode=${swapMode}&slippageBps=10&onlyDirectRoutes=${onlyDirectRoutes}`;
 
   if (platformFeeBps !== 0) {
     quote_url += `&platformFeeBps=${platformFeeBps}`;
@@ -148,6 +149,7 @@ async function create_fee_ata(mint: PublicKey) {
   const ata_exist = await rpc.getAccountInfo(ata);
 
   if (ata_exist) return ata;
+  if (ata_exist !== null) return ata;
 
   const token = tokenMap.get(mint.toString());
 
@@ -155,12 +157,14 @@ async function create_fee_ata(mint: PublicKey) {
     throw new Error(`Token metadata not found for mint ${mint.toBase58()}`);
   }
 
+  logger.info("creating fee token account");
+
   return await createAssociatedTokenAccount(
     rpc,
     payer,
     mint,
     fee,
-    null,
+    { commitment: "processed" },
     new PublicKey(token.tokenProgram)
   );
 }
