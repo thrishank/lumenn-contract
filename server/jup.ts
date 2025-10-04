@@ -130,11 +130,11 @@ export async function determineFillType(
       throw new Error("dust transaction swap value is less than 5$");
     }
 
-    if (Number(outAmount) >= escrow_data.amount.takingAmount.toNumber()) {
+    if (Number(outAmount) >= tryTakingAmount) {
       return { fill_type: "full", divisor };
     }
 
-    if (Number(outAmount) >= tryTakingAmount) {
+    if (divisor !== 1 && Number(outAmount) >= tryTakingAmount) {
       return { fill_type: "partial", divisor };
     }
 
