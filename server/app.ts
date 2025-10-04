@@ -362,6 +362,10 @@ app.get(
         isExpired: escrow_data.expiredAt.toNumber() <= Date.now(),
       });
 
+      if (escrow_data.expiredAt.eq(new BN(0))) {
+        throw new Error("Escrow is never to be expired");
+      }
+
       if (escrow_data.expiredAt.toNumber() * 1000 > Date.now()) {
         const timeUntilExpiry =
           escrow_data.expiredAt.toNumber() * 1000 - Date.now();

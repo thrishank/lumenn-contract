@@ -114,7 +114,7 @@ export async function determineFillType(
   divisor: number;
 }> {
   let tryInAmount = escrow_data.amount.makingAmount.toNumber();
-  let tryTakingAmount = escrow_data.amount.takingAmount.toNumber();
+  let tryTakingAmount = escrow_data.amount.takingAmount.toNumber() * 0.999;
   let divisor = 1;
 
   while (tryInAmount > 0 && tryTakingAmount > 0) {
@@ -130,15 +130,11 @@ export async function determineFillType(
       throw new Error("dust transaction swap value is less than 5$");
     }
 
-    if (
-      Number(outAmount) * 0.999 >=
-      escrow_data.amount.takingAmount.toNumber()
-    ) {
+    if (Number(outAmount) >= escrow_data.amount.takingAmount.toNumber()) {
       return { fill_type: "full", divisor };
     }
 
-    // NOTE: check after deduting the fee amount takingAmount - fee > quote.outAmount
-    if (Number(outAmount) * 0.999 >= tryTakingAmount) {
+    if (Number(outAmount) >= tryTakingAmount) {
       return { fill_type: "partial", divisor };
     }
 

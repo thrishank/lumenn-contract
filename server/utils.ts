@@ -76,27 +76,28 @@ export const requestLogger = (
   res.locals.requestId = requestId;
   res.locals.startTime = startTime;
 
-  logger.info("Request received", {
-    requestId,
-    method: req.method,
-    path: req.path,
-    query: req.query,
-  });
-
-  res.on("finish", () => {
-    const responseTime = performance.now() - startTime;
-    metrics.totalRequests++;
-    metrics.averageResponseTime =
-      (metrics.averageResponseTime + responseTime) / 2;
-    metrics.lastActivity = new Date().toISOString();
-
-    logger.info("Request completed", {
+  if (req.path.includes("fill") || req.path.includes("expire")) {
+    logger.info("Request received", {
       requestId,
-      statusCode: res.statusCode,
-      responseTime: `${responseTime.toFixed(2)}ms`,
+      method: req.method,
+      path: req.path,
+      query: req.query,
     });
-  });
 
+    res.on("finish", () => {
+      const responseTime = performance.now() - startTime;
+      metrics.totalRequests++;
+      metrics.averageResponseTime =
+        (metrics.averageResponseTime + responseTime) / 2;
+      metrics.lastActivity = new Date().toISOString();
+
+      logger.info("Request completed", {
+        requestId,
+        statusCode: res.statusCode,
+        responseTime: `${responseTime.toFixed(2)}ms`,
+      });
+    });
+  }
   next();
 };
 
