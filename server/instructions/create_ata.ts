@@ -99,18 +99,6 @@ export async function create_ata(
     taking_amount = inAmount;
   }
 
-  const payer_ata = await getAssociatedTokenAddress(sol_mint, payer.publicKey);
-
-  const protocol_vault = PublicKey.findProgramAddressSync(
-    [Buffer.from("protocol_vault")],
-    program.programId
-  );
-
-  const protocol_ata = await getAssociatedTokenAddress(
-    sol_mint,
-    protocol_vault[0]
-  );
-
   const instruction = await program.methods
     .createAta({
       swapData: Buffer.from(instruction_data, "base64"),
