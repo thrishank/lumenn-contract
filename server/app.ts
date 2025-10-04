@@ -11,7 +11,12 @@ import {
 import express from "express";
 import { bn, createRpc } from "@lightprotocol/stateless.js";
 import { parseEscrowFromBuffer } from "../tests/utils/fn";
-import { determineFillType, get_price, get_swap_instruction } from "./jup";
+import {
+  determineFillType,
+  get_best_slippage,
+  get_price,
+  get_swap_instruction,
+} from "./jup";
 import { create_token_ata } from "./instructions/create_ata";
 import { fill, fill_wsol } from "./instructions/fill";
 import { expire, expire_wsol } from "./instructions/expire";
@@ -196,6 +201,13 @@ app.get(
         outputMint
       );
 
+      const slippage = await get_best_slippage(
+        escrow_data,
+        escrow_data.amount.makingAmount
+          .div(new BN(fill_data.divisor))
+          .toNumber()
+      );
+
       let finalInstructionData: any = null;
       let finalAccounts: any[] = [];
       let finalAlt: any[] = [];
@@ -214,15 +226,28 @@ app.get(
             .div(new BN(fill_data.divisor))
             .toNumber(),
           "ExactIn",
-          10
+          10,
+          false,
+          slippage
         );
         finalInstructionData = instruction_data;
         finalAccounts = accounts;
         finalAlt = alt;
       } else {
-        finalInstructionData = fill_data.instruction_data;
-        finalAccounts = fill_data.accounts;
-        finalAlt = fill_data.alt;
+        const { instruction_data, accounts, alt } = await get_swap_instruction(
+          inputMint.toString(),
+          outputMint.toString(),
+          escrow_data.amount.makingAmount
+            .div(new BN(fill_data.divisor))
+            .toNumber(),
+          "ExactIn",
+          10,
+          false,
+          slippage
+        );
+        finalInstructionData = instruction_data;
+        finalAccounts = accounts;
+        finalAlt = alt;
       }
 
       if (!finalInstructionData) {

@@ -1,4 +1,4 @@
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import axios from "axios";
 import { Escrow } from "../tests/utils/fn";
 import {
@@ -11,18 +11,21 @@ import { logger, tokenMap } from "./utils";
 export async function get_quote(
   input_mint: string,
   output_mint: string,
-  amount: number
-): Promise<{ inAmount: string; outAmount: string }> {
+  amount: number,
+  slippageBps: number = 0,
+  platformFeeBps: number = 0
+): Promise<{ inAmount: string; outAmount: string; swapUsdValue: string }> {
   const quote_url =
     `https://lite-api.jup.ag/swap/v1/quote?` +
     `inputMint=${input_mint}&outputMint=${output_mint}` +
-    `&amount=${amount}&slippageBps=0`;
+    `&amount=${amount}&slippageBps=${slippageBps}&platformFeeBps=${platformFeeBps}`;
 
   const quote = await axios.get(quote_url);
 
   return {
     inAmount: quote.data.inAmount,
     outAmount: quote.data.outAmount,
+    swapUsdValue: quote.data.swapUsdValue,
   };
 }
 
@@ -34,15 +37,15 @@ export async function get_swap_instruction(
   amount: number,
   swapMode: "ExactOut" | "ExactIn",
   platformFeeBps = 0,
-  onlyDirectRoutes: boolean = false
+  onlyDirectRoutes: boolean = false,
+  slippageBps: number = 0
 ) {
   const fee_acc = await create_fee_ata(new PublicKey(input_mint));
 
-  // TODO: make slippage dyanmic based on simulation
   let quote_url =
     `https://lite-api.jup.ag/swap/v1/quote?` +
     `inputMint=${input_mint}&outputMint=${output_mint}` +
-    `&amount=${amount}&swapMode=${swapMode}&slippageBps=10&onlyDirectRoutes=${onlyDirectRoutes}`;
+    `&amount=${amount}&swapMode=${swapMode}&slippageBps=${slippageBps}&onlyDirectRoutes=${onlyDirectRoutes}`;
 
   if (platformFeeBps !== 0) {
     quote_url += `&platformFeeBps=${platformFeeBps}`;
@@ -109,30 +112,34 @@ export async function determineFillType(
 ): Promise<{
   fill_type: "full" | "partial";
   divisor: number;
-  instruction_data: any;
-  accounts: any[];
-  alt: any[];
 }> {
   let tryInAmount = escrow_data.amount.makingAmount.toNumber();
   let tryTakingAmount = escrow_data.amount.takingAmount.toNumber();
   let divisor = 1;
 
   while (tryInAmount > 0 && tryTakingAmount > 0) {
-    const { outAmount, instruction_data, accounts, alt } =
-      await get_swap_instruction(
-        inputMint.toString(),
-        outputMint.toString(),
-        tryInAmount,
-        "ExactIn",
-        10
-      );
+    const { outAmount, swapUsdValue } = await get_quote(
+      inputMint.toString(),
+      outputMint.toString(),
+      tryInAmount,
+      0,
+      10
+    );
 
-    if (outAmount >= escrow_data.amount.takingAmount.toNumber()) {
-      return { fill_type: "full", divisor, instruction_data, accounts, alt };
+    if (5 > Number(swapUsdValue)) {
+      throw new Error("dust transaction swap value is less than 5$");
     }
 
-    if (outAmount >= tryTakingAmount) {
-      return { fill_type: "partial", divisor, instruction_data, accounts, alt };
+    if (
+      Number(outAmount) * 0.999 >=
+      escrow_data.amount.takingAmount.toNumber()
+    ) {
+      return { fill_type: "full", divisor };
+    }
+
+    // NOTE: check after deduting the fee amount takingAmount - fee > quote.outAmount
+    if (Number(outAmount) * 0.999 >= tryTakingAmount) {
+      return { fill_type: "partial", divisor };
     }
 
     divisor *= 2;
@@ -167,4 +174,70 @@ async function create_fee_ata(mint: PublicKey) {
     { commitment: "processed" },
     new PublicKey(token.tokenProgram)
   );
+}
+
+export async function get_best_slippage(escrow: Escrow, input_amount: number) {
+  let slippage_bps = 5;
+
+  let best_slippage = null;
+
+  while (slippage_bps <= 50) {
+    const quote_url =
+      `https://lite-api.jup.ag/swap/v1/quote?` +
+      `inputMint=${escrow.tokens.inputMint.toString()}&outputMint=${escrow.tokens.outputMint.toString()}` +
+      `&amount=${input_amount}&slippageBps=${slippage_bps}`;
+
+    console.log(`Trying slippage: ${slippage_bps} bps`);
+
+    try {
+      const quote = await axios.get(quote_url);
+
+      let body = {
+        userPublicKey: "FFbzGFqJYhxRPTsuAJ8jjjXUTiMhAqZoGRj9x8ZCN6T7",
+        payer: "botk1pyb4oXga299ocn1U37xHrYkxty9arWjEL7QJPF",
+        quoteResponse: quote.data,
+        wrapAndUnwrapSol: false,
+      };
+
+      let config = {
+        method: "post",
+        maxBodyLength: Infinity,
+        url: "https://lite-api.jup.ag/swap/v1/swap",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        data: JSON.stringify(body),
+      };
+
+      const swap = await axios.request(config);
+
+      const transaction = VersionedTransaction.deserialize(
+        Buffer.from(swap.data.swapTransaction, "base64")
+      );
+
+      const sim = await rpc.simulateTransaction(transaction, {
+        sigVerify: false,
+      });
+
+      if (sim.value.err === null) {
+        console.log(`✅ Found passing slippage at ${slippage_bps} bps`);
+        best_slippage = slippage_bps;
+        break;
+      } else {
+        console.log(`❌ Simulation failed at ${slippage_bps} bps`);
+      }
+    } catch (err) {
+      console.log(`⚠️ Error at slippage ${slippage_bps}:`, err.message);
+    }
+
+    slippage_bps += 5;
+  }
+
+  if (!best_slippage) {
+    console.log("❌ No valid slippage found up to 50 bps");
+  }
+
+  console.log(best_slippage);
+  return best_slippage;
 }
