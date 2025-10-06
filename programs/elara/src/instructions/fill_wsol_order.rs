@@ -20,7 +20,7 @@ use crate::{
     utils::{
         expected_accounts, validate_jupiter_accounts, validate_light_accounts, LightAccountSet,
     },
-    PROTOCOL_VAULT_SEED, TOKEN_ACCOUNT_SIZE,
+    FEE_ACCOUNT, PROTOCOL_VAULT_SEED, TOKEN_ACCOUNT_SIZE,
 };
 
 use jupiter::program::Jupiter;
@@ -126,6 +126,7 @@ pub fn fill<'info>(
         ctx.accounts.sol_mint.key(),
         ctx.accounts.input_token_program.key(),
         ctx.accounts.output_token_program.key(),
+        Some(FEE_ACCOUNT),
     )?;
 
     let balance_before_swap = ctx.accounts.protocol_vault_output_mint_ata.amount;

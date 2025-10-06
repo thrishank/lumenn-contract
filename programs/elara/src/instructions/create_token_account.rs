@@ -144,6 +144,7 @@ pub fn create_token_account<'info>(
         SOL_MINT,
         ctx.accounts.input_token_program.key(),
         ctx.accounts.token_program.key(),
+        None,
     )?;
 
     let balance_before_swap = ctx.accounts.protocol_wsol_ata.amount;

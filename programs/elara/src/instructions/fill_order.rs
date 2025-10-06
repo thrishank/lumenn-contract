@@ -19,7 +19,7 @@ use crate::{
     utils::{
         expected_accounts, validate_jupiter_accounts, validate_light_accounts, LightAccountSet,
     },
-    PROTOCOL_VAULT_SEED, SOL_MINT,
+    FEE_ACCOUNT, PROTOCOL_VAULT_SEED, SOL_MINT,
 };
 
 use jupiter::{program::Jupiter, types::RoutePlanStep};
@@ -109,7 +109,6 @@ pub fn fill<'info>(
 
     let in_amount = jup_data.in_amount;
     // let out_amount = jup_data.out_amount;
-    // TODO: change in frontend to
     // NOTE: the amount we get here already deducts the fee
     // so if the taking amount is 100 USDC and fee is 0.1% so here we get 99.9 USDC
 
@@ -135,6 +134,7 @@ pub fn fill<'info>(
         ctx.accounts.output_mint.key(),
         ctx.accounts.input_token_program.key(),
         ctx.accounts.output_token_program.key(),
+        Some(FEE_ACCOUNT), // NOTE: hard coded for now
     )?;
 
     let balance_before_swap = ctx.accounts.protocol_vault_output_mint_ata.amount;
