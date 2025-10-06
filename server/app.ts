@@ -172,6 +172,11 @@ app.get(
         throw new Error("Order has expired");
       }
 
+      // This functions creates the ata if it doesn't exisit
+      let ata_created = escrow_data.tokens.outputMint.equals(SOL_MINT)
+        ? false
+        : await create_token_ata(compressed_account, escrow_data, requestId);
+
       const { current_ratio } = await get_price(
         inputMint.toString(),
         outputMint.toString()
@@ -189,11 +194,6 @@ app.get(
           `Target Ratio: ${target_ratio} is greater than current market ratio: ${current_ratio} `
         );
       }
-
-      // This functions creates the ata if it doesn't exisit
-      let ata_created = escrow_data.tokens.outputMint.equals(SOL_MINT)
-        ? false
-        : await create_token_ata(compressed_account, escrow_data, requestId);
 
       const fill_data = await determineFillType(
         escrow_data,

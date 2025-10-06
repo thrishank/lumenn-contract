@@ -147,18 +147,23 @@ export async function determineFillType(
 }
 
 async function create_fee_ata(mint: PublicKey) {
-  const ata = await getAssociatedTokenAddress(mint, fee);
-
-  const ata_exist = await rpc.getAccountInfo(ata);
-
-  if (ata_exist) return ata;
-  if (ata_exist !== null) return ata;
-
   const token = tokenMap.get(mint.toString());
 
   if (!token) {
     throw new Error(`Token metadata not found for mint ${mint.toBase58()}`);
   }
+
+  const ata = await getAssociatedTokenAddress(
+    mint,
+    fee,
+    true,
+    new PublicKey(token.tokenProgram)
+  );
+
+  const ata_exist = await rpc.getAccountInfo(ata);
+
+  if (ata_exist) return ata;
+  if (ata_exist !== null) return ata;
 
   logger.info("creating fee token account");
 

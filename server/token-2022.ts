@@ -155,6 +155,8 @@ export async function get_rent_quote(mint: PublicKey) {
       }
     }
 
+    // TODO: buffer can't above 1000 lamports
+
     if (bestMatchOutAmount >= targetRent) {
       console.log("Final result:");
       console.log(`Input amount: ${bestMatchInAmount}`);

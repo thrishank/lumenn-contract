@@ -25,8 +25,8 @@ let socket_down_count = 0;
 async function checkEndpoints() {
   if (!monitoring) return;
 
-  try {
-    for (const url of ENDPOINTS) {
+  for (const url of ENDPOINTS) {
+    try {
       const res = await axios.get(url, { timeout: 6000 });
 
       if (res.status !== 200) {
@@ -76,10 +76,12 @@ async function checkEndpoints() {
           }
         }
       }
+    } catch (err: any) {
+      await sendAlert(
+        `Something is down. Endpoint check failed for ${url}. Error Message: ${err.message}`
+      );
+      console.log(err);
     }
-  } catch (err: any) {
-    await sendAlert(`Something is down. Endpoint check failed: ${err.message}`);
-    console.log(err);
   }
 }
 

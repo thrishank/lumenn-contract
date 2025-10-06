@@ -15,7 +15,10 @@ import {
 import { Escrow } from "../../tests/utils/fn";
 import { get_swap_instruction } from "../jup";
 import BN from "bn.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  getAssociatedTokenAddress,
+  TOKEN_2022_PROGRAM_ID,
+} from "@solana/spl-token";
 import { get_rent_quote } from "../token-2022";
 import { getComputeUnitsUsed, logger } from "../utils";
 
@@ -40,7 +43,9 @@ export async function create_ata(
 
   const ata = await getAssociatedTokenAddress(
     escrow_data.tokens.outputMint,
-    escrow_data.maker
+    escrow_data.maker,
+    true,
+    escrow_data.tokens.outputTokenProgram
   );
 
   const ata_exist = await rpc.getAccountInfo(ata);
@@ -63,17 +68,9 @@ export async function create_ata(
       true
     );
 
-    const { inAmount } = await get_swap_instruction(
-      escrow_data.tokens.outputMint.toString(),
-      sol_mint.toString(),
-      2039280,
-      "ExactOut",
-      0
-    );
     instruction_data = result.instruction_data;
     accounts = result.accounts;
     alt = result.alt;
-    taking_amount = inAmount;
   } catch (err) {
     const amounts = await get_rent_quote(escrow_data.tokens.inputMint);
 
@@ -91,12 +88,28 @@ export async function create_ata(
       throw new Error("Tolarance too high");
     }
 
-    const { inAmount } = await get_rent_quote(escrow_data.tokens.outputMint);
-
     instruction_data = result.instruction_data;
     accounts = result.accounts;
     alt = result.alt;
+  }
+
+  if (escrow_data.tokens.outputMint.equals(TOKEN_2022_PROGRAM_ID)) {
+    const { inAmount } = await get_rent_quote(escrow_data.tokens.outputMint);
     taking_amount = inAmount;
+  } else {
+    try {
+      const { inAmount } = await get_swap_instruction(
+        escrow_data.tokens.outputMint.toString(),
+        sol_mint.toString(),
+        2039280,
+        "ExactOut",
+        0
+      );
+      taking_amount = inAmount;
+    } catch {
+      const { inAmount } = await get_rent_quote(escrow_data.tokens.outputMint);
+      taking_amount = inAmount;
+    }
   }
 
   const instruction = await program.methods
@@ -206,7 +219,9 @@ export async function create_ata_wsol(
 
   const ata = await getAssociatedTokenAddress(
     escrow_data.tokens.outputMint,
-    escrow_data.maker
+    escrow_data.maker,
+    true,
+    escrow_data.tokens.outputTokenProgram
   );
 
   const ata_exist = await rpc.getAccountInfo(ata);
@@ -214,13 +229,30 @@ export async function create_ata_wsol(
     throw new Error("ATA already exists");
   }
 
-  const { instruction_data } = await get_swap_instruction(
-    escrow_data.tokens.outputMint.toString(),
-    sol_mint.toString(),
-    2039280,
-    "ExactOut",
-    0
-  );
+  let instruction_data: string;
+
+  // TODO: do the same in the above ixs
+  if (escrow_data.tokens.outputTokenProgram.equals(TOKEN_2022_PROGRAM_ID)) {
+    const { inAmount } = await get_rent_quote(escrow_data.tokens.outputMint);
+    const { instruction_data: data } = await get_swap_instruction(
+      escrow_data.tokens.outputMint.toString(),
+      sol_mint.toString(),
+      Number(inAmount),
+      "ExactIn",
+      0
+    );
+    instruction_data = data;
+  } else {
+    // TODO: what if the token doesn't have ExactOut route
+    const { instruction_data: data } = await get_swap_instruction(
+      escrow_data.tokens.outputMint.toString(),
+      sol_mint.toString(),
+      2039280,
+      "ExactOut",
+      0
+    );
+    instruction_data = data;
+  }
 
   const instruction = await program.methods
     .createAtaWsol({
@@ -305,7 +337,9 @@ export async function create_token_ata(
 ) {
   const ata = await getAssociatedTokenAddress(
     escrow_data.tokens.outputMint,
-    escrow_data.maker
+    escrow_data.maker,
+    true,
+    escrow_data.tokens.outputTokenProgram
   );
 
   const ata_exist = await rpc.getAccountInfo(ata);
