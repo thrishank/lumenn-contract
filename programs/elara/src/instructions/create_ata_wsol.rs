@@ -95,8 +95,20 @@ pub fn create_token_account<'info>(
         rent.minimum_balance(ctx.accounts.maker_token_ata.to_account_info().data_len());
 
     // taking amount that is need to subtract in the state
-    if jup_data.out_amount != ata_creation_amount {
-        return Err(error!(CustomError::InvalidOutAmount));
+    if jup_data.is_exact_out {
+        if jup_data.out_amount == ata_creation_amount {
+            return Err(error!(CustomError::InvalidOutAmount));
+        }
+    } else {
+        if jup_data.out_amount < ata_creation_amount {
+            return Err(error!(CustomError::InvalidOutAmount));
+        }
+
+        // Fail if the difference exceeds 1000 lamports
+        let diff = jup_data.out_amount - ata_creation_amount;
+        if diff > 1000 {
+            return Err(error!(CustomError::InvalidOutAmount));
+        }
     }
 
     transfer_sol_from_vault(&ctx, ata_creation_amount)?;
