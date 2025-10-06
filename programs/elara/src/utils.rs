@@ -1,4 +1,3 @@
-use crate::FEE_ACCOUNT;
 use crate::{
     error::CustomError, instructions::JupiterRoutes, JUPITER_EVENT_AUTHORITY,
     JUPITER_V6_PROGRAM_ID, PROTOCOL_VAULT,
@@ -16,6 +15,7 @@ pub fn validate_jupiter_accounts(
     output_mint: Pubkey,
     input_token_program: Pubkey,
     output_token_program: Pubkey,
+    fee_account: Option<Pubkey>,
 ) -> Result<()> {
     match route {
         JupiterRoutes::ExactOutRoute => validate_exact_out_route(
@@ -24,6 +24,7 @@ pub fn validate_jupiter_accounts(
             output_mint,
             input_token_program,
             output_token_program,
+            fee_account,
         ),
         JupiterRoutes::Route => validate_route(
             jupiter_accounts,
@@ -31,6 +32,7 @@ pub fn validate_jupiter_accounts(
             output_mint,
             input_token_program,
             output_token_program,
+            fee_account,
         ),
         JupiterRoutes::SharedAccountsExactOutRoute | JupiterRoutes::SharedAccountsRoute => {
             validate_shared_accounts_route(
@@ -39,6 +41,7 @@ pub fn validate_jupiter_accounts(
                 output_mint,
                 input_token_program,
                 output_token_program,
+                fee_account,
             )
         }
     }
@@ -50,6 +53,7 @@ fn validate_exact_out_route(
     ouput_mint: Pubkey,
     input_token_program: Pubkey,
     output_token_program: Pubkey,
+    fee_account: Option<Pubkey>,
 ) -> Result<()> {
     require_keys_eq!(
         jup_accounts[0].key(),
@@ -105,17 +109,25 @@ fn validate_exact_out_route(
         CustomError::InvalidOutputMint
     );
 
-    let fee_ata = get_associated_token_address_with_program_id(
-        &FEE_ACCOUNT,
-        &input_mint,
-        &input_token_program,
-    );
+    if let Some(fee_account) = fee_account {
+        let fee_ata = get_associated_token_address_with_program_id(
+            &fee_account,
+            &input_mint,
+            &input_token_program,
+        );
 
-    require_keys_eq!(
-        jup_accounts[7].key(),
-        fee_ata,
-        CustomError::InvalidFeeAccount
-    );
+        require_keys_eq!(
+            jup_accounts[7].key(),
+            fee_ata,
+            CustomError::InvalidFeeAccount
+        );
+    } else {
+        require_keys_eq!(
+            jup_accounts[7].key(),
+            JUPITER_V6_PROGRAM_ID,
+            CustomError::InvalidFeeAccount
+        );
+    }
 
     if input_token_program == spl_token_2022::ID {
         require_keys_eq!(
@@ -152,6 +164,7 @@ fn validate_route(
     ouput_mint: Pubkey,
     input_token_program: Pubkey,
     output_token_program: Pubkey,
+    fee_account: Option<Pubkey>,
 ) -> Result<()> {
     require_keys_eq!(
         jup_accounts[0].key(),
@@ -201,17 +214,25 @@ fn validate_route(
         CustomError::InvalidOutputMint
     );
 
-    let fee_ata = get_associated_token_address_with_program_id(
-        &FEE_ACCOUNT,
-        &input_mint,
-        &input_token_program,
-    );
+    if let Some(fee_account) = fee_account {
+        let fee_ata = get_associated_token_address_with_program_id(
+            &fee_account,
+            &input_mint,
+            &input_token_program,
+        );
 
-    require_keys_eq!(
-        jup_accounts[6].key(),
-        fee_ata,
-        CustomError::InvalidFeeAccount
-    );
+        require_keys_eq!(
+            jup_accounts[6].key(),
+            fee_ata,
+            CustomError::InvalidFeeAccount
+        );
+    } else {
+        require_keys_eq!(
+            jup_accounts[6].key(),
+            JUPITER_V6_PROGRAM_ID,
+            CustomError::InvalidFeeAccount
+        );
+    }
 
     require_keys_eq!(
         jup_accounts[7].key(),
@@ -234,6 +255,7 @@ fn validate_shared_accounts_route(
     ouput_mint: Pubkey,
     input_token_program: Pubkey,
     output_token_program: Pubkey,
+    fee_account: Option<Pubkey>,
 ) -> Result<()> {
     require_keys_eq!(
         jup_accounts[0].key(),
@@ -318,17 +340,25 @@ fn validate_shared_accounts_route(
         CustomError::InvalidOutputMint
     );
 
-    let fee_ata = get_associated_token_address_with_program_id(
-        &FEE_ACCOUNT,
-        &input_mint,
-        &input_token_program,
-    );
+    if let Some(fee_account) = fee_account {
+        let fee_ata = get_associated_token_address_with_program_id(
+            &fee_account,
+            &input_mint,
+            &input_token_program,
+        );
 
-    require_keys_eq!(
-        jup_accounts[9].key(),
-        fee_ata,
-        CustomError::InvalidFeeAccount
-    );
+        require_keys_eq!(
+            jup_accounts[9].key(),
+            fee_ata,
+            CustomError::InvalidFeeAccount
+        );
+    } else {
+        require_keys_eq!(
+            jup_accounts[9].key(),
+            JUPITER_V6_PROGRAM_ID,
+            CustomError::InvalidFeeAccount
+        );
+    }
 
     if input_token_program == spl_token_2022::ID {
         require_keys_eq!(
