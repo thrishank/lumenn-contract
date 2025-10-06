@@ -56,7 +56,6 @@ export async function create_ata(
   let instruction_data;
   let accounts;
   let alt;
-  let taking_amount;
 
   try {
     const result = await get_swap_instruction(
@@ -93,23 +92,19 @@ export async function create_ata(
     alt = result.alt;
   }
 
-  if (escrow_data.tokens.outputMint.equals(TOKEN_2022_PROGRAM_ID)) {
+  let taking_amount: any;
+  try {
+    const { inAmount } = await get_swap_instruction(
+      escrow_data.tokens.outputMint.toString(),
+      sol_mint.toString(),
+      2039280,
+      "ExactOut",
+      0
+    );
+    taking_amount = inAmount;
+  } catch {
     const { inAmount } = await get_rent_quote(escrow_data.tokens.outputMint);
     taking_amount = inAmount;
-  } else {
-    try {
-      const { inAmount } = await get_swap_instruction(
-        escrow_data.tokens.outputMint.toString(),
-        sol_mint.toString(),
-        2039280,
-        "ExactOut",
-        0
-      );
-      taking_amount = inAmount;
-    } catch {
-      const { inAmount } = await get_rent_quote(escrow_data.tokens.outputMint);
-      taking_amount = inAmount;
-    }
   }
 
   const instruction = await program.methods
@@ -231,24 +226,22 @@ export async function create_ata_wsol(
 
   let instruction_data: string;
 
-  // TODO: do the same in the above ixs
-  if (escrow_data.tokens.outputTokenProgram.equals(TOKEN_2022_PROGRAM_ID)) {
+  try {
+    const { instruction_data: data } = await get_swap_instruction(
+      escrow_data.tokens.outputMint.toString(),
+      sol_mint.toString(),
+      2039280,
+      "ExactOut",
+      0
+    );
+    instruction_data = data;
+  } catch {
     const { inAmount } = await get_rent_quote(escrow_data.tokens.outputMint);
     const { instruction_data: data } = await get_swap_instruction(
       escrow_data.tokens.outputMint.toString(),
       sol_mint.toString(),
       Number(inAmount),
       "ExactIn",
-      0
-    );
-    instruction_data = data;
-  } else {
-    // TODO: what if the token doesn't have ExactOut route
-    const { instruction_data: data } = await get_swap_instruction(
-      escrow_data.tokens.outputMint.toString(),
-      sol_mint.toString(),
-      2039280,
-      "ExactOut",
       0
     );
     instruction_data = data;

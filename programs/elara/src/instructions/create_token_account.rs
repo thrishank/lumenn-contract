@@ -136,7 +136,6 @@ pub fn create_token_account<'info>(
 
     let jupiter_accounts = &remaining[10..];
 
-    // TODO: no fee account here update this function
     validate_jupiter_accounts(
         &jup_data.route,
         jupiter_accounts,

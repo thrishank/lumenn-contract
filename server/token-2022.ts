@@ -129,7 +129,8 @@ export async function get_rent_quote(mint: PublicKey) {
 
     let low = high - 1n; // The input that will be too low
 
-    // Step 4: Perform a binary search for high precision
+    // Step 4: Perform a binary search for high precision with buffer constraint
+    const MAX_BUFFER = 1000n; // Maximum allowed buffer above target
     let bestMatchInAmount = high;
     let bestMatchOutAmount = BigInt(highOut);
 
@@ -145,19 +146,29 @@ export async function get_rent_quote(mint: PublicKey) {
       const midOutput = BigInt(midOutAmount);
 
       if (midOutput >= targetRent) {
-        // This is a potential candidate, try for a smaller input
-        bestMatchInAmount = mid;
-        bestMatchOutAmount = midOutput;
-        high = mid - 1n;
+        const buffer = midOutput - targetRent;
+
+        // Check if this meets our buffer constraint
+        if (buffer <= MAX_BUFFER) {
+          // This is a valid candidate within buffer limits
+          bestMatchInAmount = mid;
+          bestMatchOutAmount = midOutput;
+          high = mid - 1n; // Try for even tighter match
+        } else {
+          // Buffer too large, need less input
+          high = mid - 1n;
+        }
       } else {
         // Output is too low, need to increase the input
         low = mid + 1n;
       }
     }
 
-    // TODO: buffer can't above 1000 lamports
-
-    if (bestMatchOutAmount >= targetRent) {
+    // Verify the final result meets all constraints
+    if (
+      bestMatchOutAmount >= targetRent &&
+      bestMatchOutAmount - targetRent <= MAX_BUFFER
+    ) {
       console.log("Final result:");
       console.log(`Input amount: ${bestMatchInAmount}`);
       console.log(`Output amount: ${bestMatchOutAmount}`);
@@ -169,7 +180,9 @@ export async function get_rent_quote(mint: PublicKey) {
         rent,
       };
     } else {
-      console.log("Could not find a suitable amount with the binary search.");
+      console.log(
+        "Could not find a suitable amount within buffer constraints (max 1000 lamports)."
+      );
       return null;
     }
   } catch (err) {
