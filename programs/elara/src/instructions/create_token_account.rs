@@ -155,6 +155,8 @@ pub fn create_token_account<'info>(
         &ctx.accounts.jupiter_program,
     )?;
 
+    ctx.accounts.protocol_wsol_ata.reload()?;
+
     let balance_after_swap = ctx.accounts.protocol_wsol_ata.amount;
 
     let diff = balance_after_swap

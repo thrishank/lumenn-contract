@@ -15,10 +15,7 @@ import {
 import { Escrow } from "../../tests/utils/fn";
 import { get_swap_instruction } from "../jup";
 import BN from "bn.js";
-import {
-  getAssociatedTokenAddress,
-  TOKEN_2022_PROGRAM_ID,
-} from "@solana/spl-token";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { get_rent_quote } from "../token-2022";
 import { getComputeUnitsUsed, logger } from "../utils";
 
