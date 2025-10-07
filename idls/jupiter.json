@@ -486,6 +486,10 @@
     {
       "name": "SwapEvent",
       "discriminator": [64, 198, 205, 232, 38, 8, 113, 226]
+    },
+    {
+      "name": "SwapsEvent",
+      "discriminator": [152, 47, 78, 235, 192, 96, 110, 106]
     }
   ],
   "errors": [
@@ -586,6 +590,11 @@
       "code": 6025,
       "name": "InvalidTokenAccount",
       "msg": "Invalid token account"
+    },
+    {
+      "code": 6026,
+      "name": "BondingCurveAlreadyCompleted",
+      "msg": "Bonding curve already completed"
     }
   ],
   "types": [
@@ -968,7 +977,18 @@
             "name": "AlphaQ",
             "fields": [{ "name": "a_to_b", "type": "bool" }]
           },
-          { "name": "RaydiumV2" }
+          { "name": "RaydiumV2" },
+          {
+            "name": "SarosDlmm",
+            "fields": [{ "name": "swap_for_y", "type": "bool" }]
+          },
+          {
+            "name": "Futarchy",
+            "fields": [
+              { "name": "side", "type": { "defined": { "name": "Side" } } }
+            ]
+          },
+          { "name": "MeteoraDammV2WithRemainingAccounts" }
         ]
       }
     },
@@ -982,6 +1002,30 @@
           { "name": "input_amount", "type": "u64" },
           { "name": "output_mint", "type": "pubkey" },
           { "name": "output_amount", "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "SwapEventV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "input_mint", "type": "pubkey" },
+          { "name": "input_amount", "type": "u64" },
+          { "name": "output_mint", "type": "pubkey" },
+          { "name": "output_amount", "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "SwapsEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "swap_events",
+            "type": { "vec": { "defined": { "name": "SwapEventV2" } } }
+          }
         ]
       }
     },
