@@ -163,11 +163,11 @@ pub fn create_token_account<'info>(
 
     require!(diff > 0, CustomError::NoTokensReceived);
 
-    if jup_data.is_exact_out && diff != ata_creation_amount {
-        return Err(error!(CustomError::InvalidOutAmount));
-    }
-
-    if !jup_data.is_exact_out {
+    if jup_data.is_exact_out {
+        if diff != ata_creation_amount {
+            return Err(error!(CustomError::InvalidOutAmount));
+        }
+    } else {
         if diff < ata_creation_amount {
             return Err(error!(CustomError::InvalidOutAmount));
         }

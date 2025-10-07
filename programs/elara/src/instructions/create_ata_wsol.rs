@@ -96,7 +96,7 @@ pub fn create_token_account<'info>(
 
     // taking amount that is need to subtract in the state
     if jup_data.is_exact_out {
-        if jup_data.out_amount == ata_creation_amount {
+        if jup_data.out_amount != ata_creation_amount {
             return Err(error!(CustomError::InvalidOutAmount));
         }
     } else {
