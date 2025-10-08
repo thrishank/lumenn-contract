@@ -19,7 +19,7 @@ const ENDPOINTS = [
 let monitoring = true;
 let alerting = false;
 let stopTimestamp: number | null = null;
-
+let alertInterval: NodeJS.Timeout | null = null; // Store interval reference
 let socket_down_count = 0;
 
 async function checkEndpoints() {
@@ -54,25 +54,21 @@ async function checkEndpoints() {
         ];
 
         for (const check of statusChecks) {
-          if (!res.data?.[check.key] && check.key !== "logs_socket_running") {
-            await sendAlert(`Endpoint ${url} is not running. ${check.message}`);
-            break;
-          }
-
           if (check.key === "logs_socket_running") {
-            socket_down_count++;
-            if (socket_down_count > 10) {
-              await sendAlert(
-                `Endpoint ${url} is not running. ${check.message}`
-              );
-              break;
-            }
-
             if (!res.data?.logs_socket_running) {
               socket_down_count++;
+              if (socket_down_count > 10) {
+                await sendAlert(
+                  `Endpoint ${url} is not running. ${check.message}`
+                );
+                break;
+              }
             } else {
               socket_down_count = 0;
             }
+          } else if (!res.data?.[check.key]) {
+            await sendAlert(`Endpoint ${url} is not running. ${check.message}`);
+            break;
           }
         }
       }
@@ -86,15 +82,31 @@ async function checkEndpoints() {
 }
 
 async function sendAlert(message: string) {
+  // Don't send alerts if monitoring is stopped
+  if (!monitoring) return;
+
   if (!alerting) {
     alerting = true;
-    const interval = setInterval(async () => {
-      if (!alerting) {
-        clearInterval(interval);
+
+    // Send the first alert immediately
+    await bot.telegram.sendMessage(ids[0], message);
+
+    // Then send every 1 minute
+    alertInterval = setInterval(async () => {
+      if (!alerting || !monitoring) {
+        stopAlerting();
         return;
       }
       await bot.telegram.sendMessage(ids[0], message);
-    }, 60 * 1000); // send every 1Min until stopped
+    }, 60 * 1000);
+  }
+}
+
+function stopAlerting() {
+  alerting = false;
+  if (alertInterval) {
+    clearInterval(alertInterval);
+    alertInterval = null;
   }
 }
 
@@ -132,19 +144,23 @@ bot.command("status", (ctx) =>
 );
 
 bot.command("stop", (ctx) => {
-  alerting = false;
+  monitoring = false;
+  stopAlerting();
   stopTimestamp = Date.now();
-  ctx.reply("Alerts stopped");
+  ctx.reply("Monitoring and alerts stopped");
 });
 
 bot.command("resume", (ctx) => {
   monitoring = true;
+  stopAlerting();
   stopTimestamp = null;
+  socket_down_count = 0; // Reset counter
   ctx.reply("Monitoring resumed");
 });
 
 bot.command("pause", (ctx) => {
   monitoring = false;
+  stopAlerting();
   ctx.reply("Monitoring paused");
 });
 
@@ -232,14 +248,14 @@ bot.command("code", async (ctx) => {
     await ctx.telegram.editMessageText(
       ctx.chat.id,
       loadingMessage.message_id,
-      null,
+      undefined,
       `Generated code with ${maxUses} use(s):\n${res.data.code}`
     );
-  } catch (err) {
+  } catch (err: any) {
     await ctx.telegram.editMessageText(
       ctx.chat.id,
       loadingMessage.message_id,
-      null,
+      undefined,
       `Failed to generate code. Error: ${err.message}`
     );
     console.error(err);
@@ -256,7 +272,7 @@ bot.telegram.setMyCommands([
   },
   { command: "code", description: "Create a Invite Code" },
   { command: "status", description: "Show monitoring status" },
-  { command: "stop", description: "Stop alerts" },
+  { command: "stop", description: "Stop monitoring and alerts" },
   { command: "resume", description: "Resume monitoring" },
   { command: "pause", description: "Pause monitoring" },
 ]);
