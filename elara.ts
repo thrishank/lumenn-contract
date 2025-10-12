@@ -1531,6 +1531,7 @@ export type Elara = {
         },
         {
           name: "jupiterProgram";
+          address: "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
         }
       ];
       args: [
