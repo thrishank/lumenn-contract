@@ -22,6 +22,8 @@ let stopTimestamp: number | null = null;
 let alertInterval: NodeJS.Timeout | null = null; // Store interval reference
 let socket_down_count = 0;
 
+let fill_check = 100;
+
 async function checkEndpoints() {
   if (!monitoring) return;
 
@@ -32,6 +34,10 @@ async function checkEndpoints() {
       if (res.status !== 200) {
         await sendAlert(`${url} returned status ${res.status}`);
       } else if (url.includes("/health") && res.data?.status !== "healthy") {
+        if (res.data.failedFills > fill_check) {
+          fill_check += 100;
+          await sendAlert("Fill Failing check /health");
+        }
         await sendAlert(`${url} unhealthy: ${JSON.stringify(res.data)}`);
       } else if (url.includes("/status")) {
         const statusChecks = [
