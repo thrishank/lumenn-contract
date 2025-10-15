@@ -4,19 +4,29 @@ import {
   ExtensionType,
   getAccountLen,
   getExtensionTypes,
+  Mint,
   TOKEN_2022_PROGRAM_ID,
   unpackMint,
 } from "@solana/spl-token";
 import { get_quote } from "./jup";
 
-async function get_rent_amount(mint: PublicKey) {
+export async function get_rent_amount(mint: PublicKey) {
   try {
     const connection = new Connection(
       "https://mainnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d"
     );
 
     const account = await connection.getAccountInfo(mint);
-    const data = unpackMint(mint, account, TOKEN_2022_PROGRAM_ID);
+
+    let data: Mint;
+    try {
+      data = unpackMint(mint, account, TOKEN_2022_PROGRAM_ID);
+    } catch (err) {
+      console.error("unpackMint failed:", err);
+      throw new Error(
+        `Invalid mint or wrong program ID for ${mint.toBase58()}`
+      );
+    }
 
     const extensions = getExtensionTypes(data.tlvData);
 

@@ -15,8 +15,8 @@ import {
 import { Escrow } from "../../tests/utils/fn";
 import { get_swap_instruction } from "../jup";
 import BN from "bn.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { get_rent_quote } from "../token-2022";
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { get_rent_amount, get_rent_quote } from "../token-2022";
 import { getComputeUnitsUsed, logger } from "../utils";
 
 const sol_mint = new PublicKey("So11111111111111111111111111111111111111112");
@@ -54,11 +54,17 @@ export async function create_ata(
   let accounts;
   let alt;
 
+  const rent_amount = escrow_data.tokens.outputTokenProgram.equals(
+    TOKEN_PROGRAM_ID
+  )
+    ? 2039280
+    : await get_rent_amount(escrow_data.tokens.outputMint);
+
   try {
     const result = await get_swap_instruction(
       escrow_data.tokens.inputMint.toString(),
       sol_mint.toString(),
-      2039280,
+      rent_amount,
       "ExactOut",
       0,
       true,
@@ -98,7 +104,7 @@ export async function create_ata(
     const { inAmount } = await get_swap_instruction(
       escrow_data.tokens.outputMint.toString(),
       sol_mint.toString(),
-      2039280,
+      rent_amount,
       "ExactOut",
       0
     );
@@ -237,11 +243,16 @@ export async function create_ata_wsol(
     );
     instruction_data = data;
   } catch {
-    const { inAmount } = await get_rent_quote(escrow_data.tokens.outputMint);
+    const rent_amount = escrow_data.tokens.outputTokenProgram.equals(
+      TOKEN_PROGRAM_ID
+    )
+      ? 2039280
+      : await get_rent_amount(escrow_data.tokens.outputMint);
+
     const { instruction_data: data } = await get_swap_instruction(
       escrow_data.tokens.outputMint.toString(),
       sol_mint.toString(),
-      Number(inAmount),
+      rent_amount,
       "ExactIn",
       0
     );
