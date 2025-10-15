@@ -61,7 +61,8 @@ export async function create_ata(
       2039280,
       "ExactOut",
       0,
-      true
+      true,
+      25
     );
 
     instruction_data = result.instruction_data;
@@ -74,7 +75,10 @@ export async function create_ata(
       escrow_data.tokens.inputMint.toString(),
       sol_mint.toString(),
       Number(amounts.inAmount),
-      "ExactIn"
+      "ExactIn",
+      0,
+      true,
+      25
     );
 
     if (
