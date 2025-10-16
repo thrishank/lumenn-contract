@@ -55,9 +55,8 @@ fn validate_exact_out_route(
     output_token_program: Pubkey,
     fee_account: Option<Pubkey>,
 ) -> Result<()> {
-    require_keys_eq!(
-        jup_accounts[0].key(),
-        spl_token::ID.key(),
+    require!(
+        jup_accounts[0].key() == spl_token::ID || jup_accounts[0].key() == spl_token_2022::ID,
         CustomError::InvalidTokenProgramId
     );
 
@@ -166,9 +165,8 @@ fn validate_route(
     output_token_program: Pubkey,
     fee_account: Option<Pubkey>,
 ) -> Result<()> {
-    require_keys_eq!(
-        jup_accounts[0].key(),
-        spl_token::ID.key(),
+    require!(
+        jup_accounts[0].key() == spl_token::ID || jup_accounts[0].key() == spl_token_2022::ID,
         CustomError::InvalidTokenProgramId
     );
 
@@ -257,9 +255,8 @@ fn validate_shared_accounts_route(
     output_token_program: Pubkey,
     fee_account: Option<Pubkey>,
 ) -> Result<()> {
-    require_keys_eq!(
-        jup_accounts[0].key(),
-        spl_token::ID,
+    require!(
+        jup_accounts[0].key() == spl_token::ID || jup_accounts[0].key() == spl_token_2022::ID,
         CustomError::InvalidTokenProgramId
     );
 
