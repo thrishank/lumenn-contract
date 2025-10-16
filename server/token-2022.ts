@@ -1,5 +1,5 @@
 import { Connection, PublicKey } from "@solana/web3.js";
-import { rpc } from "./app";
+import { connection, rpc } from "./app";
 import {
   ExtensionType,
   getAccountLen,
@@ -12,10 +12,6 @@ import { get_quote } from "./jup";
 
 export async function get_rent_amount(mint: PublicKey) {
   try {
-    const connection = new Connection(
-      "https://mainnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d"
-    );
-
     const account = await connection.getAccountInfo(mint);
 
     let data: Mint;

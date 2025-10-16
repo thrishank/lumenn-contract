@@ -44,9 +44,11 @@ if (!process.env.KEY) {
 }
 
 const url =
-  "https://mainnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d";
+  "https://mainnet.helius-rpc.com/?api-key=1648b146-14e2-4981-be0b-194b30752778";
 
-const connection = new Connection(url);
+export const connection = new Connection(url);
+
+export const rpc = createRpc(url, url, url);
 
 export let payer: Keypair;
 try {
@@ -62,8 +64,6 @@ try {
 
 const provider = new AnchorProvider(connection, new Wallet(payer), {});
 export const program = new Program<Elara>(IDL as Elara, provider);
-
-export const rpc = createRpc(url, url, url);
 
 export const SOL_MINT = new PublicKey(
   "So11111111111111111111111111111111111111112"
