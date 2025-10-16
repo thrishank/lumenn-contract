@@ -44,7 +44,7 @@ if (!process.env.KEY) {
 }
 
 const url =
-  "https://mainnet.helius-rpc.com/?api-key=1648b146-14e2-4981-be0b-194b30752778";
+  "https://mainnet.helius-rpc.com/?api-key=4e4da1cd-e329-41ee-86f7-6e7f55e807dc";
 
 export const connection = new Connection(url);
 
