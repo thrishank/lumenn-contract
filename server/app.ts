@@ -201,12 +201,13 @@ app.get(
         outputMint
       );
 
-      const slippage = await get_best_slippage(
-        escrow_data,
-        escrow_data.amount.makingAmount
-          .div(new BN(fill_data.divisor))
-          .toNumber()
-      );
+      const slippage =
+        (await get_best_slippage(
+          escrow_data,
+          escrow_data.amount.makingAmount
+            .div(new BN(fill_data.divisor))
+            .toNumber()
+        )) + 5;
 
       let finalInstructionData: any = null;
       let finalAccounts: any[] = [];
