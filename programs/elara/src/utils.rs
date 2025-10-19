@@ -289,9 +289,9 @@ fn validate_shared_accounts_route(
         &input_token_program,
     );
 
-    require_keys_eq!(
-        jup_accounts[4].key(),
-        program_source_token_account.key(),
+    require!(
+        jup_accounts[4].key() == program_source_token_account.key()
+            || jup_accounts[4].key() == source_token_account,
         CustomError::InvalidTokenAccount
     );
 
@@ -357,7 +357,7 @@ fn validate_shared_accounts_route(
         );
     }
 
-    if input_token_program == spl_token_2022::ID {
+    if input_token_program == spl_token_2022::ID || output_token_program == spl_token_2022::ID {
         require_keys_eq!(
             jup_accounts[10].key(),
             spl_token_2022::ID,
