@@ -12,7 +12,7 @@ elara = "LUMENWrdxm6FaNpmVY86KTP6ihYv8B74eoHGYkksNaP"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "https://devnet.helius-rpc.com/?api-key=c991f045-ba1f-4d71-b872-0ef87e7f039d"
+cluster = "https://devnet.helius-rpc.com/?api-key=1648b146-14e2-4981-be0b-194b30752778"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

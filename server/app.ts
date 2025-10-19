@@ -266,7 +266,8 @@ app.get(
             .toNumber(),
           "ExactIn",
           10,
-          true
+          true,
+          slippage
         );
         finalInstructionData = instruction_data;
         finalAccounts = accounts;
@@ -295,7 +296,10 @@ app.get(
 
       tx.sign([payer]);
 
-      const sig = await rpc.sendTransaction(tx);
+      const sim = await rpc.simulateTransaction(tx, { sigVerify: false });
+      console.log(sim);
+      const sig = "";
+      // const sig = await rpc.sendTransaction(tx);
       const responseTime = performance.now() - startTime;
 
       metrics.successfulFills++;

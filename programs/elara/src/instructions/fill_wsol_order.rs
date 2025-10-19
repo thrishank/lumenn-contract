@@ -76,11 +76,13 @@ pub struct FillOrderWSol<'info> {
         payer = payer,
         associated_token::mint = sol_mint,
         associated_token::authority = temp_account,
-        associated_token::token_program = input_token_program
+        associated_token::token_program = output_token_program
     )]
     pub temp_wsol_ata: InterfaceAccount<'info, TokenAccount>,
 
     pub input_token_program: Interface<'info, TokenInterface>,
+
+    #[account(address = spl_token::id())]
     pub output_token_program: Interface<'info, TokenInterface>,
 
     pub system_program: Program<'info, System>,

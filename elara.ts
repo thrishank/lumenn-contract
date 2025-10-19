@@ -1469,7 +1469,7 @@ export type Elara = {
               },
               {
                 kind: "account";
-                path: "inputTokenProgram";
+                path: "outputTokenProgram";
               },
               {
                 kind: "account";
@@ -1520,6 +1520,7 @@ export type Elara = {
         },
         {
           name: "outputTokenProgram";
+          address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
         },
         {
           name: "systemProgram";

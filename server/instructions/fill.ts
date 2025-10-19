@@ -205,7 +205,6 @@ export async function fill_wsol(
       maker: escrow_data.maker,
       inputMint: escrow_data.tokens.inputMint,
       inputTokenProgram: escrow_data.tokens.inputTokenProgram,
-      outputTokenProgram: escrow_data.tokens.outputTokenProgram,
     })
     .remainingAccounts([...CLOSE_ACCOUNTS, ...accounts])
     .instruction();

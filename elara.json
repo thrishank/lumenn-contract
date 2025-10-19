@@ -919,7 +919,7 @@
               },
               {
                 "kind": "account",
-                "path": "input_token_program"
+                "path": "output_token_program"
               },
               {
                 "kind": "account",
@@ -940,7 +940,8 @@
           "name": "input_token_program"
         },
         {
-          "name": "output_token_program"
+          "name": "output_token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "system_program",
