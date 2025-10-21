@@ -38,7 +38,8 @@ export async function get_swap_instruction(
   swapMode: "ExactOut" | "ExactIn",
   platformFeeBps = 0,
   onlyDirectRoutes: boolean = false,
-  slippageBps: number = 0
+  slippageBps: number = 0,
+  excludedDexLabels?: string[]
 ) {
   const fee_acc = await create_fee_ata(new PublicKey(input_mint));
 
@@ -51,7 +52,13 @@ export async function get_swap_instruction(
     quote_url += `&platformFeeBps=${platformFeeBps}`;
   }
 
+  if (excludedDexLabels.length > 0) {
+    quote_url += `&excludeDexes=${excludedDexLabels.join(",")}`;
+  }
+
   const quote = await axios.get(quote_url);
+
+  console.log(quote.data.routePlan);
 
   let body = {
     userPublicKey: "FFbzGFqJYhxRPTsuAJ8jjjXUTiMhAqZoGRj9x8ZCN6T7",
@@ -177,16 +184,45 @@ async function create_fee_ata(mint: PublicKey) {
   );
 }
 
+const PROGRAM_ID_TO_LABEL = new Map<string, string>();
+
+(async () => {
+  await loadProgramLabels();
+})();
+
+async function loadProgramLabels(): Promise<void> {
+  const url = "https://lite-api.jup.ag/swap/v1/program-id-to-label";
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch program labels: ${res.statusText}`);
+  }
+
+  const data: Record<string, string> = await res.json();
+  PROGRAM_ID_TO_LABEL.clear();
+
+  for (const [programId, label] of Object.entries(data)) {
+    PROGRAM_ID_TO_LABEL.set(programId, label);
+  }
+
+  console.log(`Loaded ${PROGRAM_ID_TO_LABEL.size} program labels.`);
+}
+
 export async function get_best_slippage(escrow: Escrow, input_amount: number) {
   let slippage_bps = 5;
-
+  const exclude_dexes = new Set<string>();
   let best_slippage = null;
 
   while (slippage_bps <= 50) {
+    const excludeDexesParam =
+      exclude_dexes.size > 0
+        ? `&excludeDexes=${Array.from(exclude_dexes).join(",")}`
+        : "";
+
     const quote_url =
       `https://lite-api.jup.ag/swap/v1/quote?` +
       `inputMint=${escrow.tokens.inputMint.toString()}&outputMint=${escrow.tokens.outputMint.toString()}` +
-      `&amount=${input_amount}&slippageBps=${slippage_bps}`;
+      `&amount=${input_amount}&slippageBps=${slippage_bps}${excludeDexesParam}`;
 
     console.log(`Trying slippage: ${slippage_bps} bps`);
 
@@ -226,6 +262,19 @@ export async function get_best_slippage(escrow: Escrow, input_amount: number) {
         best_slippage = slippage_bps;
         break;
       } else {
+        if (isComputeUnitExceeded(sim.value.logs)) {
+          const program_id = extractDexProgramId(sim.value.logs || []);
+          const dexLabel = PROGRAM_ID_TO_LABEL.get(program_id);
+
+          if (!exclude_dexes.has(dexLabel)) {
+            console.log(`⚠️ CU exceeded in DEX: ${dexLabel}`);
+            console.log(`Adding to exclusion list and retrying...`);
+            exclude_dexes.add(dexLabel);
+
+            // Retry with the same slippage but excluded DEX
+            continue;
+          }
+        }
         console.log(`❌ Simulation failed at ${slippage_bps} bps`);
       }
     } catch (err) {
@@ -240,5 +289,46 @@ export async function get_best_slippage(escrow: Escrow, input_amount: number) {
   }
 
   console.log(best_slippage);
-  return best_slippage;
+  return {
+    best_slippage,
+    excludedDexLabels: Array.from(exclude_dexes).map(getDexLabel),
+  };
+}
+
+function getDexLabel(programId: string): string {
+  return PROGRAM_ID_TO_LABEL.get(programId) || programId;
+}
+
+function isComputeUnitExceeded(logs?: string[]): boolean {
+  if (!logs) return false;
+  return logs.some(
+    (line) =>
+      line.toLowerCase().includes("exceeded cus meter") ||
+      line.toLowerCase().includes("exceeded cu") ||
+      line.toLowerCase().includes("program failed to complete")
+  );
+}
+
+function extractDexProgramId(logs: string[]): string | null {
+  // Find the last program invoke before the CU exceeded line
+  const idx = logs.findIndex((l) =>
+    l.toLowerCase().includes("exceeded cus meter")
+  );
+  if (idx === -1) return null;
+
+  // Look backwards for the program that caused the issue
+  for (let i = idx - 1; i >= 0; i--) {
+    const m = logs[i].match(/Program ([A-Za-z0-9]{32,44}) invoke/);
+    if (m) {
+      const programId = m[1];
+      // Skip Jupiter's main program and ComputeBudget program
+      if (
+        programId !== "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4" &&
+        programId !== "ComputeBudget111111111111111111111111111111"
+      ) {
+        return programId;
+      }
+    }
+  }
+  return null;
 }

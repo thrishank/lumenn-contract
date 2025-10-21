@@ -151,7 +151,7 @@ app.get(
       }
 
       const buffer = compressed_account?.data?.data!;
-      const escrow_data = parseEscrowFromBuffer(buffer);
+      let escrow_data = parseEscrowFromBuffer(buffer);
 
       const expiredAt = escrow_data.expiredAt.toNumber() * 1000;
 
@@ -177,6 +177,30 @@ app.get(
         ? false
         : await create_token_ata(compressed_account, escrow_data, requestId);
 
+      if (ata_created) {
+        const updated_compressed_account = await retryOperation(
+          () => rpc.getCompressedAccount(bn(address.toBytes())),
+          3,
+          1000,
+          "getCompressedAccount"
+        );
+
+        if (!updated_compressed_account?.data?.data) {
+          throw new Error(
+            "Failed to refetch compressed account after ATA creation"
+          );
+        }
+
+        escrow_data = parseEscrowFromBuffer(
+          updated_compressed_account.data.data
+        );
+
+        logger.info("Escrow data updated after ATA creation", {
+          requestId,
+          updatedMakingAmount: escrow_data.amount.makingAmount.toNumber(),
+        });
+      }
+
       const { current_ratio } = await get_price(
         inputMint.toString(),
         outputMint.toString()
@@ -201,78 +225,77 @@ app.get(
         outputMint
       );
 
-      const slippage =
-        (await get_best_slippage(
-          escrow_data,
-          escrow_data.amount.makingAmount
-            .div(new BN(fill_data.divisor))
-            .toNumber()
-        )) + 5;
+      const swapAmount = escrow_data.amount.makingAmount
+        .div(new BN(fill_data.divisor))
+        .toNumber();
 
-      let finalInstructionData: any = null;
-      let finalAccounts: any[] = [];
-      let finalAlt: any[] = [];
+      const { best_slippage, excludedDexLabels } = await get_best_slippage(
+        escrow_data,
+        swapAmount
+      );
 
-      if (ata_created) {
-        // NOTE:: this fetch call is to get the updated making amount. a few will be deducted in create ata
-        const compressed_account = await rpc.getCompressedAccount(
-          bn(address.toBytes())
-        );
+      const slippage = best_slippage + 5;
 
-        const escrow_data = parseEscrowFromBuffer(compressed_account.data.data);
-        const { instruction_data, accounts, alt } = await get_swap_instruction(
-          inputMint.toString(),
-          outputMint.toString(),
-          escrow_data.amount.makingAmount
-            .div(new BN(fill_data.divisor))
-            .toNumber(),
-          "ExactIn",
-          10,
-          false,
-          slippage
-        );
-        finalInstructionData = instruction_data;
-        finalAccounts = accounts;
-        finalAlt = alt;
-      } else {
-        const { instruction_data, accounts, alt } = await get_swap_instruction(
-          inputMint.toString(),
-          outputMint.toString(),
-          escrow_data.amount.makingAmount
-            .div(new BN(fill_data.divisor))
-            .toNumber(),
-          "ExactIn",
-          10,
-          false,
-          slippage
-        );
-        finalInstructionData = instruction_data;
-        finalAccounts = accounts;
-        finalAlt = alt;
-      }
+      let swapResult = await get_swap_instruction(
+        inputMint.toString(),
+        outputMint.toString(),
+        swapAmount,
+        "ExactIn",
+        10,
+        false,
+        slippage,
+        excludedDexLabels
+      );
 
-      if (!finalInstructionData) {
+      if (!swapResult?.instruction_data) {
         throw new Error("Swap Quote not found to fill the order");
       }
 
-      logger.info(`alt length: ${finalAlt.length}`);
+      logger.info(`Initial swap - alt length: ${swapResult.alt.length}`);
 
-      if (finalAlt.length > 2) {
-        const { instruction_data, accounts, alt } = await get_swap_instruction(
+      if (swapResult.alt.length > 2) {
+        logger.info("Trying with direct routes");
+
+        const directRouteResult = await get_swap_instruction(
           inputMint.toString(),
           outputMint.toString(),
-          escrow_data.amount.makingAmount
-            .div(new BN(fill_data.divisor))
-            .toNumber(),
+          swapAmount,
           "ExactIn",
           10,
           true,
-          slippage
+          slippage,
+          excludedDexLabels
         );
-        finalInstructionData = instruction_data;
-        finalAccounts = accounts;
-        finalAlt = alt;
+
+        // Only use direct route result if it's valid and has fewer ALTs
+        if (
+          directRouteResult?.instruction_data &&
+          directRouteResult.alt.length <= swapResult.alt.length
+        ) {
+          swapResult = directRouteResult;
+          logger.info(
+            `Direct route swap - alt length: ${swapResult.alt.length}`
+          );
+        } else {
+          logger.info(
+            "Direct route didn't improve ALT count, using original route"
+          );
+        }
       }
+
+      if (
+        !swapResult.instruction_data ||
+        !swapResult.accounts ||
+        !swapResult.alt
+      ) {
+        throw new Error(
+          "Invalid swap instruction data: missing required fields"
+        );
+      }
+
+      const finalInstructionData = swapResult.instruction_data;
+      const finalAccounts = swapResult.accounts;
+      const finalAlt = swapResult.alt;
 
       let tx: VersionedTransaction;
 
@@ -296,10 +319,7 @@ app.get(
 
       tx.sign([payer]);
 
-      const sim = await rpc.simulateTransaction(tx, { sigVerify: false });
-      console.log(sim);
-      const sig = "";
-      // const sig = await rpc.sendTransaction(tx);
+      const sig = await rpc.sendTransaction(tx);
       const responseTime = performance.now() - startTime;
 
       metrics.successfulFills++;
