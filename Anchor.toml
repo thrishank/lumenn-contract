@@ -17,11 +17,3 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
-test-ata = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/ata.test.ts"
-test-cancel = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/cancel.test.ts"
-test-close = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/close.test.ts"
-test-expire = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/expire.test.ts"
-test-fill = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/fill.test.ts"
-test-init = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/init.test.ts"
-test-partial = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/partial-fill.test.ts"
-test-update = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/elara/update.test.ts"
