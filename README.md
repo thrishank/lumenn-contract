@@ -13,7 +13,7 @@ This creates significant friction:
 
 ## Our Solution: Rent-Free Limit Orders
 
-Elara eliminates rent by fundamentally changing how orders are stored and executed. We use on-chain data compression to store order details and a single, shared vault to hold user funds.
+Lumenn eliminates rent by fundamentally changing how orders are stored and executed. We use on-chain data compression to store order details and a single, shared vault to hold user funds.
 
 This allows for a seamless, capital-efficient trading experience where users can set multiple orders without locking up any SOL in rent.
 
@@ -27,7 +27,7 @@ This allows for a seamless, capital-efficient trading experience where users can
 
 ## How It Works
 
-1. **Initialize Order**: A user deposits tokens into the main Elara protocol vault and specifies the parameters for their limit order (e.g., "Sell 100 SOL for USDC when the price hits $200").
+1. **Initialize Order**: A user deposits tokens into the main Lumenn protocol vault and specifies the parameters for their limit order (e.g., "Sell 100 SOL for USDC when the price hits $200").
 2. **Store Order Data**: The order instructions are stored on-chain using light protocol zk compression.
 3. **Price Monitoring**: A backend matching engine continuously monitors asset prices.
 4. **Execute Swap**: When an asset reaches the user's target price, the backend swaps the tokens and tokens are sent to the user, swaps powered by Jupiter.

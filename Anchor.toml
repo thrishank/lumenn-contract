@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-elara = "LUMENWrdxm6FaNpmVY86KTP6ihYv8B74eoHGYkksNaP"
+lumenn = "LUMENWrdxm6FaNpmVY86KTP6ihYv8B74eoHGYkksNaP"
 
 [registry]
 url = "https://api.apr.dev"

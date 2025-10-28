@@ -20,10 +20,4 @@ We will acknowledge your report within 24 hours and provide you with a timeline 
 
 ## Security Audits
 
-The Elara smart contract has not yet been audited by a third-party security firm. We are actively seeking a reputable firm to conduct a comprehensive security audit. Once the audit is complete, we will make the results publicly available.
-
-## Known Vulnerabilities
-
-There are no known vulnerabilities in the Elara smart contract at this time.
-
-We are committed to continuously improving the security of our smart contract and will update this document as our security practices evolve.
+The Lumenn smart contract has not yet been audited by a third-party security firm. We are actively seeking a reputable firm to conduct a comprehensive security audit. Once the audit is complete, we will make the results publicly available.
